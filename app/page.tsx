@@ -1,16 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Map, MapControls, MapRoute, type MapRef } from "@/components/ui/map";
-import { UploadPanel, parseLngLats } from "@/components/upload-panel";
+import { UploadPanel, parseLngLats, type ParsedPoint } from "@/components/upload-panel";
+
+type LngLat = [number, number];
 
 export default function Home() {
   const mapRef = useRef<MapRef>(null);
-  const [route, setRoute] = useState<[number, number][]>([]);
+  const [rawRoute, setRawRoute] = useState<LngLat[]>([]);
+  const [matchedRoute, setMatchedRoute] = useState<LngLat[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [matching, setMatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fitRoute = useCallback((coordinates: [number, number][]) => {
+  const fitRoute = useCallback((coordinates: LngLat[]) => {
     const map = mapRef.current;
     if (!map || coordinates.length === 0) return;
     let minLng = Infinity;
@@ -32,31 +36,39 @@ export default function Home() {
     );
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/route.geojson")
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        if (cancelled) return;
-        const coords = data?.features?.[0]?.geometry?.coordinates as
-          | [number, number][]
-          | undefined;
-        if (Array.isArray(coords) && coords.length >= 2) {
-          setRoute(coords);
-          setFileName("route.geojson");
-          setTimeout(() => fitRoute(coords), 300);
+  const runMatching = useCallback(
+    async (points: ParsedPoint[]) => {
+      const ordered = [...points].sort(
+        (a, b) => (a.time ?? 0) - (b.time ?? 0),
+      );
+      setMatchedRoute([]);
+      setMatching(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/match", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shape: ordered }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error ?? "Error de map-matching.");
         }
-      })
-      .catch(() => {
-        // No hay GeoJSON estático; el mapa queda vacío hasta subir un CSV.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [fitRoute]);
+        const coords = data?.geometry?.coordinates as LngLat[] | undefined;
+        if (Array.isArray(coords) && coords.length >= 2) {
+          setMatchedRoute(coords);
+          fitRoute(coords);
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "No se pudo procesar la ruta.",
+        );
+      } finally {
+        setMatching(false);
+      }
+    },
+    [fitRoute],
+  );
 
   return (
     <div className="relative h-dvh w-full">
@@ -65,8 +77,21 @@ export default function Home() {
         viewport={{ center: [-99.1332, 19.4326], zoom: 10 }}
         theme="light"
       >
-        {route.length >= 2 && (
-          <MapRoute coordinates={route} color="#4285F4" width={4} opacity={0.85} />
+        {rawRoute.length >= 2 && (
+          <MapRoute
+            coordinates={rawRoute}
+            color="#94a3b8"
+            width={3}
+            opacity={0.5}
+          />
+        )}
+        {matchedRoute.length >= 2 && (
+          <MapRoute
+            coordinates={matchedRoute}
+            color="#16a34a"
+            width={5}
+            opacity={0.9}
+          />
         )}
         <MapControls
           position="bottom-right"
@@ -79,31 +104,40 @@ export default function Home() {
 
       <UploadPanel
         fileName={fileName}
-        pointCount={route.length}
+        pointCount={rawRoute.length}
+        matching={matching}
         onFile={(text, name) => {
-          const { coordinates } = parseLngLats(text);
+          const { coordinates, points } = parseLngLats(text);
           if (coordinates.length < 2) {
             setError(
               "El CSV no tiene suficientes puntos válidos (columnas lat/lng).",
             );
-            setRoute([]);
+            setRawRoute([]);
+            setMatchedRoute([]);
             setFileName(null);
             return;
           }
           setError(null);
           setFileName(name);
-          setRoute(coordinates);
-          setTimeout(() => fitRoute(coordinates), 300);
+          setRawRoute(coordinates);
+          runMatching(points.length >= 2 ? points : coordinates.map(([lon, lat]) => ({ lon, lat })));
         }}
         onError={setError}
         onClear={() => {
-          setRoute([]);
+          setRawRoute([]);
+          setMatchedRoute([]);
           setFileName(null);
           setError(null);
         }}
       />
 
-      {error && (
+      {matching && (
+        <div className="bg-primary text-primary-foreground absolute top-4 right-4 z-10 rounded-md px-4 py-2 text-sm shadow-lg">
+          Procesando ruta con Valhalla…
+        </div>
+      )}
+
+      {error && !matching && (
         <div className="bg-destructive text-destructive-foreground absolute top-4 right-4 z-10 rounded-md px-4 py-2 text-sm shadow-lg">
           {error}
         </div>

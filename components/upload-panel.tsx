@@ -1,35 +1,51 @@
 "use client";
 
 import { useRef } from "react";
-import { Upload, X, Route as RouteIcon, FileText } from "lucide-react";
+import {
+  Upload,
+  X,
+  Route as RouteIcon,
+  FileText,
+  Loader2,
+} from "lucide-react";
 
 const LAT_COLUMNS = ["lat", "latitude", "latitud", "y"];
 const LNG_COLUMNS = ["lng", "lon", "lngt", "long", "longitude", "longitud", "x"];
+const TIME_COLUMNS = ["time", "timestamp", "fecha", "ts", "t"];
 
-function pickIndex(header: string[]): { lat: number; lng: number } {
+function pickIndex(header: string[], names: string[]): number {
   const lower = header.map((h) => h.trim().toLowerCase());
-  let lat = lower.findIndex((h) => LAT_COLUMNS.includes(h));
-  let lng = lower.findIndex((h) => LNG_COLUMNS.includes(h));
-  if (lat === -1) lat = 0;
-  if (lng === -1) lng = 1;
-  return { lat, lng };
+  return lower.findIndex((h) => names.includes(h));
 }
+
+export type ParsedPoint = {
+  lon: number;
+  lat: number;
+  time?: number;
+};
 
 export function parseLngLats(
   text: string,
-): { coordinates: [number, number][]; rows: string[][] } {
+): { coordinates: [number, number][]; points: ParsedPoint[]; rows: string[][] } {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
-  if (lines.length === 0) return { coordinates: [], rows: [] };
+  if (lines.length === 0) {
+    return { coordinates: [], points: [], rows: [] };
+  }
 
   const delimiter = lines[0].includes(";") ? ";" : ",";
   const header = lines[0].split(delimiter);
-  const { lat, lng } = pickIndex(header);
+  let lat = pickIndex(header, LAT_COLUMNS);
+  let lng = pickIndex(header, LNG_COLUMNS);
+  if (lat === -1) lat = 0;
+  if (lng === -1) lng = 1;
+  const timeIdx = pickIndex(header, TIME_COLUMNS);
   const dataLines = lines.slice(1);
 
   const coordinates: [number, number][] = [];
+  const points: ParsedPoint[] = [];
   const rows: string[][] = [];
   for (const line of dataLines) {
     const cells = line.split(delimiter);
@@ -37,14 +53,27 @@ export function parseLngLats(
     const lngNum = parseFloat(cells[lng]);
     if (Number.isNaN(latNum) || Number.isNaN(lngNum)) continue;
     coordinates.push([lngNum, latNum]);
+    const point: ParsedPoint = { lon: lngNum, lat: latNum };
+    if (timeIdx >= 0 && cells[timeIdx] !== undefined) {
+      const raw = cells[timeIdx].trim();
+      const numeric = Number(raw);
+      if (!Number.isNaN(numeric)) {
+        point.time = Math.floor(numeric / 1000);
+      } else {
+        const parsed = Date.parse(raw);
+        if (!Number.isNaN(parsed)) point.time = Math.floor(parsed / 1000);
+      }
+    }
+    points.push(point);
     rows.push(cells);
   }
-  return { coordinates, rows };
+  return { coordinates, points, rows };
 }
 
 type UploadPanelProps = {
   fileName: string | null;
   pointCount: number;
+  matching?: boolean;
   onFile(text: string, name: string): void;
   onError(message: string): void;
   onClear(): void;
@@ -53,6 +82,7 @@ type UploadPanelProps = {
 export function UploadPanel({
   fileName,
   pointCount,
+  matching = false,
   onFile,
   onError,
   onClear,
@@ -107,6 +137,13 @@ export function UploadPanel({
           <FileText className="size-3.5" />
           Se esperan columnas de latitud y longitud (lat/lng).
         </p>
+
+        {matching && (
+          <div className="bg-muted text-muted-foreground flex items-center gap-2 rounded-md px-3 py-2 text-xs">
+            <Loader2 className="size-3.5 animate-spin" />
+            Ajustando a calles con Valhalla…
+          </div>
+        )}
 
         {fileName && (
           <div className="bg-muted text-foreground flex items-center justify-between rounded-md px-3 py-2 text-xs">
