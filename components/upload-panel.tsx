@@ -74,7 +74,9 @@ type UploadPanelProps = {
   fileName: string | null;
   pointCount: number;
   matching?: boolean;
+  mapMatchingEnabled: boolean;
   onFile(text: string, name: string): void;
+  onMapMatchingChange(enabled: boolean): void;
   onError(message: string): void;
   onClear(): void;
 };
@@ -83,7 +85,9 @@ export function UploadPanel({
   fileName,
   pointCount,
   matching = false,
+  mapMatchingEnabled,
   onFile,
+  onMapMatchingChange,
   onError,
   onClear,
 }: UploadPanelProps) {
@@ -137,6 +141,25 @@ export function UploadPanel({
           <FileText className="size-3.5" />
           Se esperan columnas de latitud y longitud (lat/lng).
         </p>
+
+        <label className="border-border flex items-center justify-between rounded-md border px-3 py-2.5">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-foreground text-xs font-medium">
+              Ajustar a calles
+            </span>
+            <span className="text-muted-foreground text-[11px]">
+              Usar map matching con Valhalla
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={mapMatchingEnabled}
+            disabled={!fileName || matching}
+            onChange={(event) => onMapMatchingChange(event.target.checked)}
+            className="accent-primary size-4 cursor-pointer disabled:cursor-not-allowed"
+            aria-label="Activar ajuste de ruta a calles"
+          />
+        </label>
 
         {matching && (
           <div className="bg-muted text-muted-foreground flex items-center gap-2 rounded-md px-3 py-2 text-xs">

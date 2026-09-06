@@ -10,8 +10,10 @@ export default function Home() {
   const mapRef = useRef<MapRef>(null);
   const [rawRoute, setRawRoute] = useState<LngLat[]>([]);
   const [matchedRoute, setMatchedRoute] = useState<LngLat[]>([]);
+  const [parsedPoints, setParsedPoints] = useState<ParsedPoint[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [matching, setMatching] = useState(false);
+  const [mapMatchingEnabled, setMapMatchingEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fitRoute = useCallback((coordinates: LngLat[]) => {
@@ -120,13 +122,31 @@ export default function Home() {
           setError(null);
           setFileName(name);
           setRawRoute(coordinates);
-          runMatching(points.length >= 2 ? points : coordinates.map(([lon, lat]) => ({ lon, lat })));
+          setParsedPoints(
+            points.length >= 2
+              ? points
+              : coordinates.map(([lon, lat]) => ({ lon, lat })),
+          );
+          setMatchedRoute([]);
+          setMapMatchingEnabled(false);
+          fitRoute(coordinates);
+        }}
+        mapMatchingEnabled={mapMatchingEnabled}
+        onMapMatchingChange={(enabled) => {
+          setMapMatchingEnabled(enabled);
+          if (enabled) {
+            runMatching(parsedPoints);
+          } else {
+            setMatchedRoute([]);
+          }
         }}
         onError={setError}
         onClear={() => {
           setRawRoute([]);
           setMatchedRoute([]);
+          setParsedPoints([]);
           setFileName(null);
+          setMapMatchingEnabled(false);
           setError(null);
         }}
       />
