@@ -75,8 +75,10 @@ type UploadPanelProps = {
   pointCount: number;
   matching?: boolean;
   mapMatchingEnabled: boolean;
+  catmullRomEnabled: boolean;
   onFile(text: string, name: string): void;
   onMapMatchingChange(enabled: boolean): void;
+  onCatmullRomChange(enabled: boolean): void;
   onError(message: string): void;
   onClear(): void;
 };
@@ -86,8 +88,10 @@ export function UploadPanel({
   pointCount,
   matching = false,
   mapMatchingEnabled,
+  catmullRomEnabled,
   onFile,
   onMapMatchingChange,
+  onCatmullRomChange,
   onError,
   onClear,
 }: UploadPanelProps) {
@@ -158,6 +162,25 @@ export function UploadPanel({
             onChange={(event) => onMapMatchingChange(event.target.checked)}
             className="accent-primary size-4 cursor-pointer disabled:cursor-not-allowed"
             aria-label="Activar ajuste de ruta a calles"
+          />
+        </label>
+
+        <label className="border-border flex items-center justify-between rounded-md border px-3 py-2.5">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-foreground text-xs font-medium">
+              Suavizar ruta
+            </span>
+            <span className="text-muted-foreground text-[11px]">
+              Aplicar filtro Catmull-Rom
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={catmullRomEnabled}
+            disabled={!fileName}
+            onChange={(event) => onCatmullRomChange(event.target.checked)}
+            className="accent-primary size-4 cursor-pointer disabled:cursor-not-allowed"
+            aria-label="Activar filtro Catmull-Rom"
           />
         </label>
 

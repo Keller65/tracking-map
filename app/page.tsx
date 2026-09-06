@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Map, MapControls, MapRoute, type MapRef } from "@/components/ui/map";
 import { UploadPanel, parseLngLats, type ParsedPoint } from "@/components/upload-panel";
-
-type LngLat = [number, number];
+import { catmullRomRoute, type LngLat } from "@/lib/route";
 
 export default function Home() {
   const mapRef = useRef<MapRef>(null);
@@ -14,7 +13,17 @@ export default function Home() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [matching, setMatching] = useState(false);
   const [mapMatchingEnabled, setMapMatchingEnabled] = useState(false);
+  const [catmullRomEnabled, setCatmullRomEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const displayedRawRoute = useMemo(
+    () => (catmullRomEnabled ? catmullRomRoute(rawRoute) : rawRoute),
+    [rawRoute, catmullRomEnabled],
+  );
+  const displayedMatchedRoute = useMemo(
+    () => (catmullRomEnabled ? catmullRomRoute(matchedRoute) : matchedRoute),
+    [matchedRoute, catmullRomEnabled],
+  );
 
   const fitRoute = useCallback((coordinates: LngLat[]) => {
     const map = mapRef.current;
@@ -79,17 +88,17 @@ export default function Home() {
         viewport={{ center: [-99.1332, 19.4326], zoom: 10 }}
         theme="light"
       >
-        {rawRoute.length >= 2 && (
+        {displayedRawRoute.length >= 2 && (
           <MapRoute
-            coordinates={rawRoute}
+            coordinates={displayedRawRoute}
             color="#94a3b8"
             width={3}
             opacity={0.5}
           />
         )}
-        {matchedRoute.length >= 2 && (
+        {displayedMatchedRoute.length >= 2 && (
           <MapRoute
-            coordinates={matchedRoute}
+            coordinates={displayedMatchedRoute}
             color="#16a34a"
             width={5}
             opacity={0.9}
@@ -132,6 +141,7 @@ export default function Home() {
           fitRoute(coordinates);
         }}
         mapMatchingEnabled={mapMatchingEnabled}
+        catmullRomEnabled={catmullRomEnabled}
         onMapMatchingChange={(enabled) => {
           setMapMatchingEnabled(enabled);
           if (enabled) {
@@ -140,6 +150,7 @@ export default function Home() {
             setMatchedRoute([]);
           }
         }}
+        onCatmullRomChange={setCatmullRomEnabled}
         onError={setError}
         onClear={() => {
           setRawRoute([]);
@@ -147,6 +158,7 @@ export default function Home() {
           setParsedPoints([]);
           setFileName(null);
           setMapMatchingEnabled(false);
+          setCatmullRomEnabled(false);
           setError(null);
         }}
       />
