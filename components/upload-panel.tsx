@@ -76,9 +76,14 @@ type UploadPanelProps = {
   matching?: boolean;
   mapMatchingEnabled: boolean;
   catmullRomEnabled: boolean;
+  outlierDetectionEnabled: boolean;
+  ekfEnabled: boolean;
+  removedOutlierCount: number;
   onFile(text: string, name: string): void;
   onMapMatchingChange(enabled: boolean): void;
   onCatmullRomChange(enabled: boolean): void;
+  onOutlierDetectionChange(enabled: boolean): void;
+  onEkfChange(enabled: boolean): void;
   onError(message: string): void;
   onClear(): void;
 };
@@ -89,9 +94,14 @@ export function UploadPanel({
   matching = false,
   mapMatchingEnabled,
   catmullRomEnabled,
+  outlierDetectionEnabled,
+  ekfEnabled,
+  removedOutlierCount,
   onFile,
   onMapMatchingChange,
   onCatmullRomChange,
+  onOutlierDetectionChange,
+  onEkfChange,
   onError,
   onClear,
 }: UploadPanelProps) {
@@ -171,7 +181,7 @@ export function UploadPanel({
               Suavizar ruta
             </span>
             <span className="text-muted-foreground text-[11px]">
-              Aplicar filtro Catmull-Rom
+              Resampling Catmull-Rom + simplificación tipo Strava
             </span>
           </span>
           <input
@@ -183,6 +193,55 @@ export function UploadPanel({
             aria-label="Activar filtro Catmull-Rom"
           />
         </label>
+
+        <label className="border-border flex items-center justify-between rounded-md border px-3 py-2.5">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-foreground text-xs font-medium">
+              Detectar valores atípicos
+            </span>
+            <span className="text-muted-foreground text-[11px]">
+              Eliminar saltos irrealmente grandes
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={outlierDetectionEnabled}
+            disabled={!fileName}
+            onChange={(event) =>
+              onOutlierDetectionChange(event.target.checked)
+            }
+            className="accent-primary size-4 cursor-pointer disabled:cursor-not-allowed"
+            aria-label="Activar detección de valores atípicos"
+          />
+        </label>
+
+        <label className="border-border flex items-center justify-between rounded-md border px-3 py-2.5">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-foreground text-xs font-medium">
+              Filtrar con EKF
+            </span>
+            <span className="text-muted-foreground text-[11px]">
+              Lat/lon + velocidad, R adaptativo
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={ekfEnabled}
+            disabled={!fileName}
+            onChange={(event) => onEkfChange(event.target.checked)}
+            className="accent-primary size-4 cursor-pointer disabled:cursor-not-allowed"
+            aria-label="Activar filtro EKF"
+          />
+        </label>
+
+        {outlierDetectionEnabled && removedOutlierCount > 0 && (
+          <div className="text-muted-foreground bg-muted rounded-md px-3 py-2 text-xs">
+            {removedOutlierCount}{" "}
+            {removedOutlierCount === 1
+              ? "valor atípico eliminado"
+              : "valores atípicos eliminados"}
+          </div>
+        )}
 
         {matching && (
           <div className="bg-muted text-muted-foreground flex items-center gap-2 rounded-md px-3 py-2 text-xs">

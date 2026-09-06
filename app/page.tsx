@@ -1,29 +1,70 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Map, MapControls, MapRoute, type MapRef } from "@/components/ui/map";
-import { UploadPanel, parseLngLats, type ParsedPoint } from "@/components/upload-panel";
-import { catmullRomRoute, type LngLat } from "@/lib/route";
+import {
+  UploadPanel,
+  parseLngLats,
+  type ParsedPoint,
+} from "@/components/upload-panel";
+import {
+  resampleRoute,
+  simplifyRoute,
+  type LngLat,
+} from "@/lib/route";
+import { filterOutliers } from "@/lib/outliers";
+import { ekfFilter } from "@/lib/ekf";
+
+const RESAMPLE_SPACING_M = 20;
+const SIMPLIFY_TOLERANCE_M = 6;
 
 export default function Home() {
   const mapRef = useRef<MapRef>(null);
-  const [rawRoute, setRawRoute] = useState<LngLat[]>([]);
+  const [allPoints, setAllPoints] = useState<ParsedPoint[]>([]);
   const [matchedRoute, setMatchedRoute] = useState<LngLat[]>([]);
-  const [parsedPoints, setParsedPoints] = useState<ParsedPoint[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [matching, setMatching] = useState(false);
   const [mapMatchingEnabled, setMapMatchingEnabled] = useState(false);
-  const [catmullRomEnabled, setCatmullRomEnabled] = useState(false);
+  const [smoothingEnabled, setSmoothingEnabled] = useState(false);
+  const [outlierDetectionEnabled, setOutlierDetectionEnabled] =
+    useState(false);
+  const [ekfEnabled, setEkfEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const displayedRawRoute = useMemo(
-    () => (catmullRomEnabled ? catmullRomRoute(rawRoute) : rawRoute),
-    [rawRoute, catmullRomEnabled],
+  const outlierResult = useMemo(
+    () =>
+      outlierDetectionEnabled ? filterOutliers(allPoints) : null,
+    [allPoints, outlierDetectionEnabled],
   );
-  const displayedMatchedRoute = useMemo(
-    () => (catmullRomEnabled ? catmullRomRoute(matchedRoute) : matchedRoute),
-    [matchedRoute, catmullRomEnabled],
+  const removedOutlierCount = outlierResult?.removedCount ?? 0;
+  const basePoints = outlierResult?.points ?? allPoints;
+
+  const ekfResult = useMemo(
+    () => (ekfEnabled ? ekfFilter(basePoints) : null),
+    [basePoints, ekfEnabled],
   );
+  const workingPoints = ekfResult?.points ?? basePoints;
+
+  const rawRoute = useMemo(
+    () => workingPoints.map((p) => [p.lon, p.lat] as LngLat),
+    [workingPoints],
+  );
+
+  const displayedRawRoute = useMemo(() => {
+    if (!smoothingEnabled) return rawRoute;
+    return simplifyRoute(
+      resampleRoute(rawRoute, RESAMPLE_SPACING_M),
+      SIMPLIFY_TOLERANCE_M,
+    );
+  }, [rawRoute, smoothingEnabled]);
+
+  const displayedMatchedRoute = useMemo(() => {
+    if (!smoothingEnabled) return matchedRoute;
+    return simplifyRoute(
+      resampleRoute(matchedRoute, RESAMPLE_SPACING_M),
+      SIMPLIFY_TOLERANCE_M,
+    );
+  }, [matchedRoute, smoothingEnabled]);
 
   const fitRoute = useCallback((coordinates: LngLat[]) => {
     const map = mapRef.current;
@@ -46,6 +87,10 @@ export default function Home() {
       { padding: 60, duration: 800, maxZoom: 16 },
     );
   }, []);
+
+  useEffect(() => {
+    if (rawRoute.length >= 2) fitRoute(rawRoute);
+  }, [rawRoute, fitRoute]);
 
   const runMatching = useCallback(
     async (points: ParsedPoint[]) => {
@@ -115,7 +160,7 @@ export default function Home() {
 
       <UploadPanel
         fileName={fileName}
-        pointCount={rawRoute.length}
+        pointCount={workingPoints.length}
         matching={matching}
         onFile={(text, name) => {
           const { coordinates, points } = parseLngLats(text);
@@ -123,42 +168,64 @@ export default function Home() {
             setError(
               "El CSV no tiene suficientes puntos válidos (columnas lat/lng).",
             );
-            setRawRoute([]);
+            setAllPoints([]);
             setMatchedRoute([]);
             setFileName(null);
             return;
           }
           setError(null);
           setFileName(name);
-          setRawRoute(coordinates);
-          setParsedPoints(
+          setAllPoints(
             points.length >= 2
               ? points
               : coordinates.map(([lon, lat]) => ({ lon, lat })),
           );
           setMatchedRoute([]);
           setMapMatchingEnabled(false);
-          fitRoute(coordinates);
         }}
         mapMatchingEnabled={mapMatchingEnabled}
-        catmullRomEnabled={catmullRomEnabled}
+        catmullRomEnabled={smoothingEnabled}
+        outlierDetectionEnabled={outlierDetectionEnabled}
+        ekfEnabled={ekfEnabled}
+        removedOutlierCount={removedOutlierCount}
         onMapMatchingChange={(enabled) => {
           setMapMatchingEnabled(enabled);
           if (enabled) {
-            runMatching(parsedPoints);
+            runMatching(workingPoints);
           } else {
             setMatchedRoute([]);
           }
         }}
-        onCatmullRomChange={setCatmullRomEnabled}
+        onCatmullRomChange={setSmoothingEnabled}
+        onOutlierDetectionChange={(enabled) => {
+          setOutlierDetectionEnabled(enabled);
+          setMatchedRoute([]);
+          if (mapMatchingEnabled) {
+            const base = enabled
+              ? filterOutliers(allPoints).points
+              : allPoints;
+            runMatching(ekfEnabled ? ekfFilter(base).points : base);
+          }
+        }}
+        onEkfChange={(enabled) => {
+          setEkfEnabled(enabled);
+          setMatchedRoute([]);
+          if (mapMatchingEnabled) {
+            const base = outlierDetectionEnabled
+              ? filterOutliers(allPoints).points
+              : allPoints;
+            runMatching(enabled ? ekfFilter(base).points : base);
+          }
+        }}
         onError={setError}
         onClear={() => {
-          setRawRoute([]);
+          setAllPoints([]);
           setMatchedRoute([]);
-          setParsedPoints([]);
           setFileName(null);
           setMapMatchingEnabled(false);
-          setCatmullRomEnabled(false);
+          setSmoothingEnabled(false);
+          setOutlierDetectionEnabled(false);
+          setEkfEnabled(false);
           setError(null);
         }}
       />
