@@ -28,6 +28,15 @@ type MapRouteProps = {
   interactive?: boolean;
 };
 
+function toMultiLineCoordinates(
+  coordinates: [number, number][],
+): [number, number][][] {
+  return coordinates.slice(0, -1).map((coordinate, index) => [
+    coordinate,
+    coordinates[index + 1],
+  ]);
+}
+
 function MapRoute({
   id: propId,
   coordinates,
@@ -55,7 +64,7 @@ function MapRoute({
       data: {
         type: "Feature",
         properties: {},
-        geometry: { type: "LineString", coordinates: [] },
+        geometry: { type: "MultiLineString", coordinates: [] },
       },
     });
 
@@ -92,7 +101,10 @@ function MapRoute({
       source.setData({
         type: "Feature",
         properties: {},
-        geometry: { type: "LineString", coordinates },
+        geometry: {
+          type: "MultiLineString",
+          coordinates: toMultiLineCoordinates(coordinates),
+        },
       });
     }
   }, [isLoaded, map, coordinates, sourceId]);
