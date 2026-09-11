@@ -23,14 +23,16 @@ const DeviceMarkerComponent = React.memo(function DeviceMarker({ deviceId, lat, 
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <div
-          className={`relative size-12 p-2 ${getBgColor()} rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-110 text-white`}
-          data-heading-arrow
-          style={{ transform: `rotate(${heading}deg)` }}
-        >
-          <TruckIcon size={24} weight="fill" />
-        </div>
+      <TooltipTrigger
+        render={
+          <div
+            className={`relative size-12 p-2 ${getBgColor()} rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-110 text-white`}
+            data-heading-arrow
+            style={{ transform: `rotate(${heading}deg)` }}
+          />
+        }
+      >
+        <TruckIcon size={24} weight="fill" />
       </TooltipTrigger>
       <TooltipContent>
         <div className="font-semibold">{deviceId}</div>

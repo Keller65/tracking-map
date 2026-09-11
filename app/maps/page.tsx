@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useSession } from "next-auth/react";
 import axios from "axios";
 import { useSocketIO } from "@/lib/hooks/useSocketIO";
 import { format, parse } from "date-fns";
@@ -207,8 +206,16 @@ const buildTrailFeatures = (
 });
 
 export default function Page() {
-  const { data: session } = useSession();
-  const token = session?.user?.token;
+  // Auth token comes from localStorage (no next-auth used in this project).
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    setToken(
+      typeof window !== "undefined"
+        ? window.localStorage.getItem("settings:token")
+        : null
+    );
+  }, []);
 
   // ── State ──────────────────────────────────────────────────
   const [devices, setDevices] = useState<Map<string, Device>>(new Map());
@@ -288,7 +295,7 @@ export default function Page() {
                 { position: pos, timestamp: ts, speed: speedKmh, cumDistKm: 0 },
               ],
               totalDistance: existing?.totalDistance ?? 0,
-              isMoving: existing?.isMoving ?? d.isMoving,
+              isMoving: existing?.isMoving ?? d.isMoving ?? false,
               batteryLevel: d.batteryLevel,
               isOnline: d.isOnline,
             });
@@ -1014,7 +1021,7 @@ export default function Page() {
             {deviceList.length === 0 && (
               <CardContent className="pb-4 pt-1 text-center">
                 <p className="text-xs text-muted-foreground">
-                  {token ? "Cargando dispositivos…" : "Iniciando sesión…"}
+                  {token ? "Cargando dispositivos…" : "Sin token configurado…"}
                 </p>
               </CardContent>
             )}
@@ -1119,11 +1126,13 @@ export default function Page() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">Desde</p>
                   <Popover open={fromOpen} onOpenChange={setFromOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full" size="sm">
-                        <CalendarIcon className="h-3.5 w-3.5" />
-                        <span className="text-xs truncate">{fmtDateDisplay(dateFrom)} {timeFrom.slice(0, 5)}</span>
-                      </Button>
+                    <PopoverTrigger
+                      render={
+                        <Button variant="outline" className="w-full" size="sm" />
+                      }
+                    >
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                      <span className="text-xs truncate">{fmtDateDisplay(dateFrom)} {timeFrom.slice(0, 5)}</span>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
@@ -1150,11 +1159,13 @@ export default function Page() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">Hasta</p>
                   <Popover open={toOpen} onOpenChange={setToOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full" size="sm">
-                        <CalendarIcon className="h-3.5 w-3.5" />
-                        <span className="text-xs truncate">{fmtDateDisplay(dateTo)} {timeTo.slice(0, 5)}</span>
-                      </Button>
+                    <PopoverTrigger
+                      render={
+                        <Button variant="outline" className="w-full" size="sm" />
+                      }
+                    >
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                      <span className="text-xs truncate">{fmtDateDisplay(dateTo)} {timeTo.slice(0, 5)}</span>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="end">
                       <Calendar
