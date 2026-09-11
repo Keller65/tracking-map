@@ -747,7 +747,7 @@ export default function Page() {
   useEffect(() => {
     if (!lastMessages || lastMessages.size === 0) return;
 
-    lastMessages.forEach((msg, deviceId) => {
+    lastMessages.forEach((msg: any, deviceId: string) => {
       const newPos: [number, number] = [msg.longitude, msg.latitude];
       const markerRef = markersRef.current.get(deviceId);
 
@@ -761,7 +761,7 @@ export default function Page() {
       const next = new Map(prev);
       let changed = false;
 
-      lastMessages.forEach((msg, deviceId) => {
+      lastMessages.forEach((msg: any, deviceId: string) => {
         const existing = next.get(deviceId);
 
         const newPos: [number, number] = [msg.longitude, msg.latitude];
@@ -807,7 +807,7 @@ export default function Page() {
   useEffect(() => {
     if (connectedQueue.length === 0) return;
 
-    connectedQueue.forEach((e) => {
+    connectedQueue.forEach((e: any) => {
       toast.success(`${e.deviceName || e.deviceId} se conectó`);
     });
 
@@ -821,7 +821,7 @@ export default function Page() {
   useEffect(() => {
     if (disconnectedQueue.length === 0) return;
 
-    disconnectedQueue.forEach((e) => {
+    disconnectedQueue.forEach((e: any) => {
       toast.error(`${e.deviceName || e.deviceId} se desconectó`, {
         description: e.reason ? `Motivo: ${e.reason}` : "Cliente fuera de línea",
       });
