@@ -103,6 +103,41 @@ const fmtTime = (v: string | number): string =>
     hour12: true,
   });
 
+type LiveUpdate = {
+  id: string;
+  name?: string;
+  position: [number, number];
+  speedKmh: number;
+  timestamp: number;
+  battery: number;
+};
+
+// Tolerates the common WS payload shapes (camelCase / lowercase variants).
+const normalizeMessage = (
+  msg: Record<string, unknown>
+): LiveUpdate | null => {
+  const lng = Number(msg.longitude ?? msg.lng ?? msg.lon ?? NaN);
+  const lat = Number(msg.latitude ?? msg.lat ?? NaN);
+  const id = String(
+    msg.deviceId ?? msg.deviceID ?? msg.device_id ?? msg.id ?? msg.androidId ?? ""
+  );
+  if (!id || !Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+
+  const rawTs = new Date(String(msg.timestamp ?? "")).getTime();
+  const timestamp = Number.isFinite(rawTs) ? rawTs : Date.now();
+  const speed = Number(msg.speed ?? 0);
+  const battery = Number(msg.battery ?? msg.batteryLevel ?? 0);
+
+  return {
+    id,
+    name: typeof msg.deviceName === "string" ? msg.deviceName : undefined,
+    position: [lng, lat],
+    speedKmh: (Number.isFinite(speed) ? speed : 0) * 3.6,
+    timestamp,
+    battery: Number.isFinite(battery) ? battery : 0,
+  };
+};
+
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 export default function Page() {
@@ -322,13 +357,23 @@ export default function Page() {
   useEffect(() => {
     if (!lastMessages || lastMessages.size === 0) return;
 
+    const liveUpdates: LiveUpdate[] = [];
     lastMessages.forEach((msg, deviceId) => {
-      const newPos: [number, number] = [msg.longitude, msg.latitude];
-      const markerRef = markersRef.current.get(deviceId);
+      const live = normalizeMessage({
+        ...(msg as unknown as Record<string, unknown>),
+        deviceId: msg.deviceId || deviceId,
+      });
+      if (live) liveUpdates.push(live);
+    });
+
+    if (liveUpdates.length === 0) return;
+
+    liveUpdates.forEach((u) => {
+      const markerRef = markersRef.current.get(u.id);
 
       // Set target position for smooth animation
       if (markerRef) {
-        markerRef.targetPosition = newPos;
+        markerRef.targetPosition = u.position;
       }
     });
 
@@ -336,40 +381,37 @@ export default function Page() {
       const next = new Map(prev);
       let changed = false;
 
-      lastMessages.forEach((msg, deviceId) => {
-        const existing = next.get(deviceId);
-
-        const newPos: [number, number] = [msg.longitude, msg.latitude];
-        const newTs = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
-        const speedKmh = (msg.speed ?? 0) * 3.6;
+      liveUpdates.forEach((u) => {
+        const existing = next.get(u.id);
 
         if (!existing) {
-          // Alta: dispositivo que llega solo por WS (no estaba previamente).
-          next.set(deviceId, {
-            id: deviceId,
-            name: msg.deviceName || deviceId,
-            position: newPos,
-            speed: speedKmh,
-            lastUpdate: new Date(newTs).toISOString(),
-            timestamp: newTs,
-            trail: [newPos],
-            trailPoints: [{ position: newPos, timestamp: newTs, speed: speedKmh, cumDistKm: 0 }],
+          // Alta: dispositivo que llega por WS (no estaba previamente).
+          next.set(u.id, {
+            id: u.id,
+            name: u.name || u.id,
+            position: u.position,
+            speed: u.speedKmh,
+            lastUpdate: new Date(u.timestamp).toISOString(),
+            timestamp: u.timestamp,
+            trail: [u.position],
+            trailPoints: [{ position: u.position, timestamp: u.timestamp, speed: u.speedKmh, cumDistKm: 0 }],
             totalDistance: 0,
-            isMoving: speedKmh > 0,
-            batteryLevel: 0,
+            isMoving: u.speedKmh > 0,
+            batteryLevel: u.battery,
             isOnline: true,
           });
           changed = true;
           return;
         }
 
-        next.set(deviceId, {
+        next.set(u.id, {
           ...existing,
-          position: newPos,
-          speed: speedKmh,
-          timestamp: newTs,
-          lastUpdate: new Date(newTs).toISOString(),
-          isMoving: speedKmh > 0,
+          position: u.position,
+          speed: u.speedKmh,
+          timestamp: u.timestamp,
+          lastUpdate: new Date(u.timestamp).toISOString(),
+          isMoving: u.speedKmh > 0,
+          batteryLevel: u.battery,
         });
         changed = true;
       });

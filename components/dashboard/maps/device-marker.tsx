@@ -37,7 +37,7 @@ const DeviceMarkerComponent = React.memo(function DeviceMarker({ deviceId, lat, 
       <TooltipContent>
         <div className="font-semibold">{deviceId}</div>
         <div className="text-muted-foreground text-xs">
-          Lat: {lat.toFixed(4)}, Lng: {lng.toFixed(4)}
+          Lat: {Number.isFinite(lat) ? lat.toFixed(4) : "—"}, Lng: {Number.isFinite(lng) ? lng.toFixed(4) : "—"}
         </div>
       </TooltipContent>
     </Tooltip>
