@@ -21,9 +21,13 @@ function normalizeLocationMessage(data: unknown): LocationMessage | null {
     ? payload.geometry as Record<string, unknown>
     : {}
   const coordinates = Array.isArray(geometry.coordinates) ? geometry.coordinates : []
+  const raw = properties._raw && typeof properties._raw === 'object'
+    ? properties._raw as Record<string, unknown>
+    : {}
 
-  const longitude = Number(payload.longitude ?? payload.lng ?? properties.longitude ?? coordinates[0])
-  const latitude = Number(payload.latitude ?? payload.lat ?? properties.latitude ?? coordinates[1])
+  // Prioridad: _raw (fix del dispositivo) > coordenadas emitidas > top-level
+  const longitude = Number(raw.longitude ?? payload.longitude ?? payload.lng ?? properties.longitude ?? coordinates[0])
+  const latitude = Number(raw.latitude ?? payload.latitude ?? payload.lat ?? properties.latitude ?? coordinates[1])
   const deviceId = String(payload.deviceId ?? payload.deviceID ?? properties.deviceId ?? properties.deviceID ?? '')
 
   if (!deviceId || !Number.isFinite(longitude) || !Number.isFinite(latitude)) return null
