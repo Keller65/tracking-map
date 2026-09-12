@@ -211,8 +211,12 @@ export default function Page() {
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.on("load", () => {
       mapRef.current = map;
+      map.resize();
       setMapReady(true);
     });
+
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    resizeObserver.observe(mapContainer.current);
 
     map.on('style.load', () => {
       map.setFog({
@@ -239,6 +243,7 @@ export default function Page() {
       markersRef.current.clear();
 
       map.remove();
+      resizeObserver.disconnect();
       mapRef.current = null;
       setMapReady(false);
     };
@@ -480,8 +485,8 @@ export default function Page() {
   // RENDER
   // ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-[92vh]">
-      <div className="relative flex-1" style={{ width: "100%", height: "calc(100vh - 120px)" }}>
+    <div className="flex h-dvh flex-col">
+      <div className="relative flex-1" style={{ width: "100%", height: "100%" }}>
         {/* ── Left panel ──────────────────────────────────── */}
         <div
           className="absolute top-4 left-4 z-10 flex flex-col gap-3"
