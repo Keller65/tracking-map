@@ -7,7 +7,35 @@ interface LocationMessage {
   latitude: number
   longitude: number
   speed?: number
-  timestamp?: string
+  timestamp?: string | number
+}
+
+function normalizeLocationMessage(data: unknown): LocationMessage | null {
+  if (!data || typeof data !== 'object') return null
+
+  const payload = data as Record<string, unknown>
+  const properties = payload.properties && typeof payload.properties === 'object'
+    ? payload.properties as Record<string, unknown>
+    : {}
+  const geometry = payload.geometry && typeof payload.geometry === 'object'
+    ? payload.geometry as Record<string, unknown>
+    : {}
+  const coordinates = Array.isArray(geometry.coordinates) ? geometry.coordinates : []
+
+  const longitude = Number(payload.longitude ?? payload.lng ?? properties.longitude ?? coordinates[0])
+  const latitude = Number(payload.latitude ?? payload.lat ?? properties.latitude ?? coordinates[1])
+  const deviceId = String(payload.deviceId ?? payload.deviceID ?? properties.deviceId ?? properties.deviceID ?? '')
+
+  if (!deviceId || !Number.isFinite(longitude) || !Number.isFinite(latitude)) return null
+
+  return {
+    deviceId,
+    deviceName: String(payload.deviceName ?? properties.deviceName ?? deviceId),
+    latitude,
+    longitude,
+    speed: Number(payload.speed ?? properties.speed ?? 0),
+    timestamp: payload.timestamp as string | number | undefined ?? properties.timestamp as string | number | undefined,
+  }
 }
 
 interface ConnectionEvent {
@@ -101,8 +129,11 @@ export const useSocketIOStore = create<SocketIOState>((set, get) => ({
       set({ disconnectedQueue: [...get().disconnectedQueue, data], liveDeviceIds: live })
     })
 
-    socket.on('location', (data: LocationMessage) => {
-      pendingUpdates.push(data)
+    socket.on('location', (data: unknown) => {
+      const location = normalizeLocationMessage(data)
+      if (!location) return
+
+      pendingUpdates.push(location)
 
       if (!throttleTimeout) {
         throttleTimeout = setTimeout(() => {

@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { TruckIcon } from "@phosphor-icons/react";
 
 interface DeviceMarkerProps {
   deviceId: string;
@@ -15,24 +14,24 @@ interface DeviceMarkerProps {
 }
 
 const DeviceMarkerComponent = React.memo(function DeviceMarker({ deviceId, lat, lng, heading = 0, isActive, isMuted, isOnline = true }: DeviceMarkerProps) {
-  const getBgColor = () => {
-    if (!isOnline) return "bg-gray-400 dark:bg-gray-400";
-    if (isActive) return "bg-brand-primary";
-    return "bg-brand-primary";
-  };
-
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <div
-            className={`relative size-12 p-2 ${getBgColor()} rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-110 text-white`}
+            className={`relative size-12 flex items-center justify-center cursor-pointer transition-all hover:scale-110 ${!isOnline ? "opacity-50" : ""} ${isActive ? "drop-shadow-[0_0_6px_rgba(59,130,246,0.9)]" : ""}`}
             data-heading-arrow
             style={{ transform: `rotate(${heading}deg)` }}
-          />
+          >
+            <img
+              src="/car_up.png"
+              alt=""
+              className="size-12 object-contain"
+              draggable={false}
+            />
+          </div>
         }
       >
-        <TruckIcon size={24} weight="fill" />
       </TooltipTrigger>
       <TooltipContent>
         <div className="font-semibold">{deviceId}</div>
