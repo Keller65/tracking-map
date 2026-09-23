@@ -161,11 +161,6 @@ export function DeviceDetailsPanel({
                 mono
               />
             </div>
-            {route.stops.length > 0 && (
-              <p className="text-[11px] text-muted-foreground px-1">
-                Puntos morados: paradas en el mapa.
-              </p>
-            )}
           </div>
         )}
 

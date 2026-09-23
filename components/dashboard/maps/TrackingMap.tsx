@@ -24,8 +24,6 @@ const MAP_STYLE = "mapbox://styles/mapbox/streets-v11";
 const TRAIL_COLOR = "#3b82f6";
 const ROUTE_COLOR = "#3b82f6";
 const ROUTE_SOURCE = "device-route";
-const STOPS_SOURCE = "device-stops";
-const STOPS_COLOR = "#8b5cf6";
 const GEO_COLOR = "#8b5cf6";
 
 type LiveUpdate = {
@@ -256,7 +254,7 @@ export function TrackingMap() {
     return removeLayers;
   }, [showGeofences, geofences, mapReady]);
 
-  // ── Dibujar / quitar la ruta y paradas en el mapa ────────
+  // ── Dibujar / quitar la ruta en el mapa ──────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
@@ -264,16 +262,7 @@ export function TrackingMap() {
     const removeRoute = () => {
       try {
         if (map.getLayer(ROUTE_SOURCE)) map.removeLayer(ROUTE_SOURCE);
-        if (map.getLayer(STOPS_SOURCE)) map.removeLayer(STOPS_SOURCE);
         if (map.getSource(ROUTE_SOURCE)) map.removeSource(ROUTE_SOURCE);
-        if (map.getSource(STOPS_SOURCE)) map.removeSource(STOPS_SOURCE);
-      } catch {}
-    };
-
-    const removeStops = () => {
-      try {
-        if (map.getLayer(STOPS_SOURCE)) map.removeLayer(STOPS_SOURCE);
-        if (map.getSource(STOPS_SOURCE)) map.removeSource(STOPS_SOURCE);
       } catch {}
     };
 
@@ -290,52 +279,24 @@ export function TrackingMap() {
         geometry: { type: "LineString", coordinates: coords },
       })),
     };
-    const stopsData: GeoJSON.FeatureCollection = {
-      type: "FeatureCollection",
-      features: route.stops.map((s) => ({
-        type: "Feature",
-        properties: { inicio: s.inicio, fin: s.fin, duracionMin: s.duracionMin },
-        geometry: { type: "Point", coordinates: s.position },
-      })),
-    };
 
-    const upsert = (
-      sourceId: string,
-      layerId: string,
-      data: GeoJSON.FeatureCollection,
-      layerType: "line" | "circle",
-      paint: Record<string, unknown>,
-    ) => {
-      const existing = map.getSource(sourceId) as
-        | mapboxgl.GeoJSONSource
-        | undefined;
-      if (existing) {
-        existing.setData(data);
-      } else {
-        map.addSource(sourceId, { type: "geojson", data });
-        map.addLayer(
-          layerType === "line"
-            ? { id: layerId, type: "line", source: sourceId, paint }
-            : { id: layerId, type: "circle", source: sourceId, paint },
-        );
-      }
-    };
-
-    upsert(ROUTE_SOURCE, ROUTE_SOURCE, lineData, "line", {
-      "line-color": ROUTE_COLOR,
-      "line-width": 4,
-      "line-opacity": 0.85,
-    });
-
-    if (route.stops.length > 0) {
-      upsert(STOPS_SOURCE, STOPS_SOURCE, stopsData, "circle", {
-        "circle-color": STOPS_COLOR,
-        "circle-radius": 5,
-        "circle-stroke-width": 2,
-        "circle-stroke-color": "#ffffff",
-      });
+    const existing = map.getSource(ROUTE_SOURCE) as
+      | mapboxgl.GeoJSONSource
+      | undefined;
+    if (existing) {
+      existing.setData(lineData);
     } else {
-      removeStops();
+      map.addSource(ROUTE_SOURCE, { type: "geojson", data: lineData });
+      map.addLayer({
+        id: ROUTE_SOURCE,
+        type: "line",
+        source: ROUTE_SOURCE,
+        paint: {
+          "line-color": ROUTE_COLOR,
+          "line-width": 4,
+          "line-opacity": 0.85,
+        },
+      });
     }
 
     let minLng = Infinity,

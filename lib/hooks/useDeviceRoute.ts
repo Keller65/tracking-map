@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { format } from "date-fns";
 import {
   getRutas,
   parseRutas,
@@ -30,8 +31,8 @@ export function useDeviceRoute(deviceId: string | null) {
 
     const params: RutasParams = { limit: 2000 };
     if (range?.from)
-      params.desde = range.from.toISOString().slice(0, 10);
-    if (range?.to) params.hasta = range.to.toISOString().slice(0, 10);
+      params.desde = format(range.from, "yyyy-MM-dd");
+    if (range?.to) params.hasta = format(range.to, "yyyy-MM-dd");
 
     getRutas(deviceId, params)
       .then((fc) => {
