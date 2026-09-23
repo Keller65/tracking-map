@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { CalendarIcon } from "@phosphor-icons/react";
-import type { DateRange } from "react-day-picker";
+import type { DateRange, Matcher } from "react-day-picker";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,34 +17,23 @@ type DateRangePickerProps = {
   onRangeChange: (range: DateRange | undefined) => void;
 };
 
-export function DateRangePicker({ range, onRangeChange }: DateRangePickerProps) {
+function RangeCalendarField({
+  label,
+  value,
+  disabledMatcher,
+  defaultMonth,
+  onSelect,
+}: {
+  label: string;
+  value: Date | undefined;
+  disabledMatcher: Matcher | undefined;
+  defaultMonth: Date | undefined;
+  onSelect: (date: Date | undefined) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [from, setFrom] = useState<Date | undefined>(range?.from);
-  const [to, setTo] = useState<Date | undefined>(range?.to);
 
-  useEffect(() => {
-    if (!open) {
-      setFrom(range?.from);
-      setTo(range?.to);
-    }
-  }, [open, range]);
-
-  const label =
-    from && to
-      ? `Historial: ${format(from, "dd/MM/yyyy")} — ${format(to, "dd/MM/yyyy")}`
-      : from
-        ? `Historial: desde ${format(from, "dd/MM/yyyy")}`
-        : "Historial: Todo el tiempo";
-
-  const handleApply = () => {
-    onRangeChange(from || to ? { from: from ?? undefined, to } : undefined);
-    setOpen(false);
-  };
-
-  const handleClear = () => {
-    setFrom(undefined);
-    setTo(undefined);
-    onRangeChange(undefined);
+  const handleSelect = (date: Date | undefined) => {
+    onSelect(date);
     setOpen(false);
   };
 
@@ -58,58 +47,64 @@ export function DateRangePicker({ range, onRangeChange }: DateRangePickerProps) 
             className="w-full justify-start gap-2 text-xs font-normal"
           >
             <CalendarIcon className="h-3.5 w-3.5" />
-            {label}
+            <span className="text-muted-foreground">{label}:</span>
+            {value ? format(value, "dd/MM/yyyy") : "Cualquiera"}
           </Button>
         }
       />
       <PopoverContent className="w-auto p-2.5" align="start">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              Fecha inicio
-            </span>
-            <Calendar
-              mode="single"
-              selected={from}
-              onSelect={setFrom}
-              defaultMonth={from}
-              disabled={to ? { after: to } : undefined}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              Fecha final
-            </span>
-            <Calendar
-              mode="single"
-              selected={to}
-              onSelect={setTo}
-              defaultMonth={to ?? from}
-              disabled={from ? { before: from } : undefined}
-            />
-          </div>
-        </div>
-        <div className="flex gap-2 pt-1">
-          <Button
-            size="sm"
-            className="flex-1 text-xs"
-            onClick={handleApply}
-            disabled={!from && !to}
-          >
-            Aplicar
-          </Button>
-          {(from || to) && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 text-xs"
-              onClick={handleClear}
-            >
-              Limpiar
-            </Button>
-          )}
-        </div>
+        <Calendar
+          mode="single"
+          selected={value}
+          onSelect={handleSelect}
+          defaultMonth={defaultMonth}
+          disabled={disabledMatcher}
+        />
       </PopoverContent>
     </Popover>
+  );
+}
+
+export function DateRangePicker({ range, onRangeChange }: DateRangePickerProps) {
+  const from = range?.from;
+  const to = range?.to;
+
+  const setFrom = (d: Date | undefined) =>
+    onRangeChange({ from: d ?? undefined, to });
+  const setTo = (d: Date | undefined) =>
+    onRangeChange({ from, to: d ?? undefined });
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-muted-foreground">
+        Rango de fechas
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <RangeCalendarField
+          label="Inicio"
+          value={from}
+          disabledMatcher={to ? { after: to } : undefined}
+          defaultMonth={from ?? to}
+          onSelect={setFrom}
+        />
+        <RangeCalendarField
+          label="Final"
+          value={to}
+          disabledMatcher={from ? { before: from } : undefined}
+          defaultMonth={to ?? from}
+          onSelect={setTo}
+        />
+      </div>
+      {(from || to) && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full text-xs"
+          onClick={() => onRangeChange(undefined)}
+        >
+          Limpiar
+        </Button>
+      )}
+    </div>
   );
 }

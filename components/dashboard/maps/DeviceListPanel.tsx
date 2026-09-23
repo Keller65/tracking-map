@@ -9,7 +9,6 @@ import {
   MagnifyingGlass,
   MapPin,
   MapTrifoldIcon,
-  TimerIcon,
 } from "@phosphor-icons/react";
 import {
   Card,
@@ -38,8 +37,6 @@ type DeviceListPanelProps = {
   showGeofences: boolean;
   geofenceCount: number;
   onToggleGeofences: () => void;
-  showStops: boolean;
-  onToggleStops: () => void;
 };
 
 export function DeviceListPanel({
@@ -54,8 +51,6 @@ export function DeviceListPanel({
   showGeofences,
   geofenceCount,
   onToggleGeofences,
-  showStops,
-  onToggleStops,
 }: DeviceListPanelProps) {
   return (
     <div
@@ -199,21 +194,6 @@ export function DeviceListPanel({
               No hay geo-referencias guardadas.
             </p>
           )}
-
-          <Button
-            onClick={onToggleStops}
-            variant={showStops ? "default" : "outline"}
-            size="sm"
-            className="w-full text-xs"
-          >
-            <TimerIcon className="h-3.5 w-3.5" />
-            {showStops ? "Ocultar paradas" : "Mostrar paradas"}
-            {showStops ? (
-              <EyeIcon className="h-3.5 w-3.5 ml-auto" />
-            ) : (
-              <EyeSlashIcon className="h-3.5 w-3.5 ml-auto" />
-            )}
-          </Button>
         </CardContent>
       </Card>
     </div>

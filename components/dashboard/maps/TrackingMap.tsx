@@ -72,7 +72,6 @@ export function TrackingMap() {
   const [mapReady, setMapReady] = useState(false);
   const [showGeofences, setShowGeofences] = useState(false);
   const [geofences, setGeofences] = useState<GeoReference[]>([]);
-  const [showStops, setShowStops] = useState(true);
 
   const { devices, setDevices, refreshing, refresh } = useDevicePositions();
   const {
@@ -186,7 +185,7 @@ export function TrackingMap() {
       // Cleanup all marker roots before removing map
       markersRef.current.forEach(({ marker, root }) => {
         marker.remove();
-        root.unmount();
+        queueMicrotask(() => root.unmount());
       });
       markersRef.current.clear();
 
@@ -328,7 +327,7 @@ export function TrackingMap() {
       "line-opacity": 0.85,
     });
 
-    if (showStops && route.stops.length > 0) {
+    if (route.stops.length > 0) {
       upsert(STOPS_SOURCE, STOPS_SOURCE, stopsData, "circle", {
         "circle-color": STOPS_COLOR,
         "circle-radius": 5,
@@ -364,7 +363,7 @@ export function TrackingMap() {
     );
 
     return removeRoute;
-  }, [route, showStops, mapReady]);
+  }, [route, mapReady]);
 
   // ── Draw / update markers on map ──────────────────────────
   useEffect(() => {
@@ -570,8 +569,6 @@ export function TrackingMap() {
         showGeofences={showGeofences}
         geofenceCount={geofences.length}
         onToggleGeofences={handleToggleGeofences}
-        showStops={showStops}
-        onToggleStops={() => setShowStops((v) => !v)}
       />
 
       {selectedDevice && (
@@ -584,7 +581,6 @@ export function TrackingMap() {
           routeError={routeError}
           range={range}
           onRangeChange={setRange}
-          showStops={showStops}
           onClose={handleClosePanel}
           onFlyTo={handleFlyTo}
         />

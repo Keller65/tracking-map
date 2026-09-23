@@ -76,13 +76,65 @@ export type RutasResponse = {
   >;
 };
 
+export type Format = "geojson" | "polyline";
+
 export type RutasParams = {
   desde?: string;
   hasta?: string;
   limit?: number;
   stopRadius?: number;
-  format?: "polyline";
+  format?: Format;
 };
+
+export type RubroProperties = {
+  deviceId: string;
+  deviceName?: string;
+  muestras: number;
+  polyline?: string;
+};
+
+export type UbicacionesResponse = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry?: RecorridoGeometry;
+    properties: RubroProperties;
+  }>;
+};
+
+export type DistanciaResponse = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry?: RecorridoGeometry;
+    properties: RubroProperties & { km?: number };
+  }>;
+};
+
+export type TiemposEstaticosResponse = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry: { type: "Point"; coordinates: LonLat };
+    properties: {
+      deviceId: string;
+      inicio: string;
+      fin: string;
+      duracionMin: number;
+      muestras: number;
+    };
+  }>;
+};
+
+export const parseTiemposEstaticos = (
+  fc: TiemposEstaticosResponse,
+): RouteStop[] =>
+  fc.features.map((f) => ({
+    position: f.geometry.coordinates,
+    inicio: f.properties.inicio,
+    fin: f.properties.fin,
+    duracionMin: f.properties.duracionMin,
+  }));
 
 export type RouteStop = {
   position: LonLat;
@@ -164,15 +216,18 @@ export const getRutas = (deviceId: string, params?: RutasParams) =>
 
 export const getUbicaciones = (
   deviceId: string,
-  params?: { desde?: string; hasta?: string; limit?: number; format?: "polyline" },
-) => getJSON<unknown>(`/ubicaciones${qs({ deviceId, ...params })}`);
+  params?: { desde?: string; hasta?: string; limit?: number; format?: Format },
+) => getJSON<UbicacionesResponse>(`/ubicaciones${qs({ deviceId, ...params })}`);
 
 export const getDistancia = (
   deviceId: string,
-  params?: { desde?: string; hasta?: string; format?: "polyline" },
-) => getJSON<unknown>(`/distancia${qs({ deviceId, ...params })}`);
+  params?: { desde?: string; hasta?: string; format?: Format },
+) => getJSON<DistanciaResponse>(`/distancia${qs({ deviceId, ...params })}`);
 
 export const getTiemposEstaticos = (
   deviceId: string,
   params?: { desde?: string; hasta?: string; stopRadius?: number },
-) => getJSON<unknown>(`/tiempos-estaticos${qs({ deviceId, ...params })}`);
+) =>
+  getJSON<TiemposEstaticosResponse>(
+    `/tiempos-estaticos${qs({ deviceId, ...params })}`,
+  );

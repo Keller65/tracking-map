@@ -18,7 +18,6 @@ import type { RouteInfo } from "@/lib/isync-api";
 import type { Device } from "@/types/tracking";
 
 const ROUTE_COLOR = "#3b82f6";
-const STOPS_COLOR = "#8b5cf6";
 
 type DeviceDetailsPanelProps = {
   device: Device;
@@ -29,7 +28,6 @@ type DeviceDetailsPanelProps = {
   routeError: string | null;
   range: DateRange | undefined;
   onRangeChange: (range: DateRange | undefined) => void;
-  showStops: boolean;
   onClose: () => void;
   onFlyTo: () => void;
 };
@@ -43,7 +41,6 @@ export function DeviceDetailsPanel({
   routeError,
   range,
   onRangeChange,
-  showStops,
   onClose,
   onFlyTo,
 }: DeviceDetailsPanelProps) {
@@ -163,15 +160,8 @@ export function DeviceDetailsPanel({
                 accent={ROUTE_COLOR}
                 mono
               />
-              <StatChip
-                icon={<MapPinIcon className="h-3 w-3" />}
-                label="Paradas"
-                value={`${route.stops.length}`}
-                accent={STOPS_COLOR}
-                mono
-              />
             </div>
-            {route.stops.length > 0 && showStops && (
+            {route.stops.length > 0 && (
               <p className="text-[11px] text-muted-foreground px-1">
                 Puntos morados: paradas en el mapa.
               </p>
