@@ -4,6 +4,7 @@ const GEOVALLAS_API_BASE =
   process.env.GEOVALLAS_API_BASE ?? "https://isync-tracker-ws.vercel.app";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.0.3"],
   async rewrites() {
     return [
       {

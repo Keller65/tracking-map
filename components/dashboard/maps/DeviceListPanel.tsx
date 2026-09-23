@@ -61,8 +61,8 @@ export function DeviceListPanel({
 }: DeviceListPanelProps) {
   return (
     <div
-      className="absolute top-4 left-4 z-10 flex flex-col gap-3"
-      style={{ width: 320, zIndex: 10 }}
+      className="absolute top-4 left-4 z-10 flex flex-col gap-3 w-[min(320px,calc(100vw-2rem))]"
+      style={{ zIndex: 10 }}
     >
       <Card className="bg-background/95 backdrop-blur-sm shadow-xl">
         <CardHeader className="pb-2">
@@ -130,7 +130,7 @@ export function DeviceListPanel({
                     onClick={() => onDeviceClick(device.id)}
                     className={`w-full text-left p-2.5 rounded-lg transition-all duration-150 ${
                       isSelected
-                        ? "bg-brand-primary text-white shadow-md"
+                        ? "bg-primary text-primary-foreground shadow-md"
                         : "bg-muted/60 hover:bg-muted"
                     }`}
                   >
@@ -156,7 +156,7 @@ export function DeviceListPanel({
                     <div
                       className={`text-xs mt-0.5 ${
                         isSelected
-                          ? "text-white/70"
+                          ? "text-primary-foreground/70"
                           : "text-muted-foreground"
                       }`}
                     >

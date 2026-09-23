@@ -11,6 +11,7 @@
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@phosphor-icons/react": "^2.1.10",
+    "@turf/point-to-polygon-distance": "^7.4.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn": "^0.2.6",

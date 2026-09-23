@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { toast } from "sonner";
+import pointToPolygonDistance from "@turf/point-to-polygon-distance";
 import { Crosshair } from "@phosphor-icons/react";
 import { useSocketIO } from "@/lib/hooks/useSocketIO";
 import { useDevicePositions } from "@/lib/hooks/useDevicePositions";
@@ -29,6 +30,9 @@ const TRAIL_COLOR = "#3b82f6";
 const ROUTE_COLOR = "#3b82f6";
 const ROUTE_SOURCE = "device-route";
 const GEO_COLOR = "#8b5cf6";
+// Margen de tolerancia por ruido del GPS: cuenta como "dentro" si el punto
+// está a menos de esta distancia del borde del polígono.
+const GEOFENCE_TOLERANCE_M = 30;
 const DRAFT_SOURCE = "geovalla-draft";
 const DRAFT_LINE_ID = "geovalla-draft-line";
 const DRAFT_FILL_ID = "geovalla-draft-fill";
@@ -245,6 +249,63 @@ export function TrackingMap() {
       cancelled = true;
     };
   }, [showGeovallas]);
+
+  // ── Cargar geovallas una vez al montar (detección) ────────
+  useEffect(() => {
+    let cancelled = false;
+    getGeovallas()
+      .then((fc) => {
+        if (!cancelled) setGeovallas(fc.features);
+      })
+      .catch(() => { });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ── Detectar entrada a geovallas (turf) ───────────────────
+  const insideRef = useRef<Set<string>>(new Set());
+  const seededInsideRef = useRef(false);
+  const alertAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (geovallas.length === 0 || devices.size === 0) return;
+
+    const inside = new Set<string>();
+    devices.forEach((device, deviceId) => {
+      const [lng, lat] = device.position;
+      for (const f of geovallas) {
+        const geom = f.geometry;
+        if (geom.type !== "Polygon" || f.id == null) continue;
+        try {
+          const distance = pointToPolygonDistance([lng, lat], geom, {
+            units: "meters",
+          });
+if (Number.isFinite(distance) && distance <= GEOFENCE_TOLERANCE_M) {
+            const key = `${deviceId}|${f.id}`;
+            inside.add(key);
+            const nombre = f.properties?.nombre ?? `id ${f.id}`;
+            if (!insideRef.current.has(key)) {
+              if (seededInsideRef.current) {
+                toast.info(`${device.name} entró en la geovalla "${nombre}"`);
+              } else {
+                toast.info(`${device.name} está dentro de la geovalla "${nombre}"`);
+              }
+              const audio =
+                alertAudioRef.current ??
+                (alertAudioRef.current = new Audio("/location.mp3"));
+              audio.currentTime = 0;
+              audio.play().catch(() => {});
+            }
+          }
+        } catch {
+          // geometría inválida: se ignora
+        }
+      }
+    });
+    seededInsideRef.current = true;
+    insideRef.current = inside;
+  }, [devices, geovallas]);
 
   // ── Dibujar / quitar geovallas en el mapa ─────────────────
   useEffect(() => {
@@ -784,7 +845,7 @@ export function TrackingMap() {
         {/* ── Panel de dibujo de geovalla (modal) ─────────── */}
         {drawing && (
           <div
-            className="absolute bottom-4 left-1/2 w-[360px] -translate-x-1/2"
+            className="absolute bottom-4 left-1/2 w-[min(360px,calc(100vw-2rem))] -translate-x-1/2"
             style={{ zIndex: 50 }}
           >
             <Card className="bg-background/95 border-border shadow-xl backdrop-blur-sm">
@@ -846,10 +907,7 @@ export function TrackingMap() {
       </div>
 
       {/* ── Columna dedicada: datos / detalles del tracking ── */}
-      <aside
-        className="relative shrink-0 border-l border-border bg-background z-10"
-        style={{ width: 320 }}
-      >
+      <aside className="absolute inset-y-0 right-0 z-30 w-4/5 max-w-sm shrink-0 border-l border-border bg-background shadow-2xl sm:w-[320px] md:relative md:shadow-none" >
         {selectedDevice ? (
           <DeviceDetailsPanel
             device={selectedDevice}
