@@ -35,8 +35,10 @@ export default function RootLayout({
       lang="es"
       className={cn("h-full", "antialiased", poppins.variable, geistSans.variable, geistMono.variable, "font-sans", jetbrainsMono.variable)}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
-      <Toaster position="top-right" richColors />
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Toaster position="top-right" richColors />
+      </body>
     </html>
   );
 }
