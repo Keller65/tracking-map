@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async rewrites() {
+    return [
+      {
+        source: "/isync-api/:path*",
+        destination: "https://isync-tracker-ws.vercel.app/api/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
