@@ -11,7 +11,6 @@ import {
   TimerIcon,
 } from "@phosphor-icons/react";
 import type { DateRange } from "react-day-picker";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { StatChip } from "./StatChip";
 import { DateRangePicker } from "./DateRangePicker";
 import type { RouteInfo } from "@/lib/isync-api";
@@ -45,24 +44,20 @@ export function DeviceDetailsPanel({
   onFlyTo,
 }: DeviceDetailsPanelProps) {
   return (
-    <Card
-      className="bg-background/95 backdrop-blur-sm shadow-xl absolute top-4 right-4 z-10"
-      style={{ width: 320, zIndex: 10 }}
-    >
-      <CardContent className="pt-3 pb-3 space-y-3">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Crosshair className="h-4 w-4" />
-            {device.name}
-          </CardTitle>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-base leading-none rounded-full w-6 h-6 flex items-center justify-center hover:bg-muted transition-colors"
-          >
-            ✕
-          </button>
-        </div>
+    <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <Crosshair className="h-4 w-4" />
+          {device.name}
+        </h2>
+        <button
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground text-base leading-none rounded-full w-6 h-6 flex items-center justify-center hover:bg-muted transition-colors"
+        >
+          ✕
+        </button>
+      </div>
 
         {/* Realtime connection status */}
         <div
@@ -171,7 +166,6 @@ export function DeviceDetailsPanel({
         >
           Centrar en mapa
         </button>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

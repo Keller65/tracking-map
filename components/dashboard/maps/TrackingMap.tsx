@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { toast } from "sonner";
+import { Crosshair } from "@phosphor-icons/react";
 import { useSocketIO } from "@/lib/hooks/useSocketIO";
 import { useDevicePositions } from "@/lib/hooks/useDevicePositions";
 import { useDeviceRoute } from "@/lib/hooks/useDeviceRoute";
@@ -517,7 +518,10 @@ export function TrackingMap() {
   // RENDER
   // ─────────────────────────────────────────────────────────────
   return (
-    <div className="relative flex-1" style={{ width: "100%", height: "100%" }}>
+    <div
+      className="relative flex-1 flex overflow-hidden"
+      style={{ width: "100%", height: "100%" }}
+    >
       <DeviceListPanel
         devices={deviceList}
         wsConnected={wsConnected}
@@ -532,27 +536,45 @@ export function TrackingMap() {
         onToggleGeofences={handleToggleGeofences}
       />
 
-      {selectedDevice && (
-        <DeviceDetailsPanel
-          device={selectedDevice}
-          wsConnected={wsConnected}
-          selectedIsLive={selectedIsLive}
-          route={route}
-          routeLoading={routeLoading}
-          routeError={routeError}
-          range={range}
-          onRangeChange={setRange}
-          onClose={handleClosePanel}
-          onFlyTo={handleFlyTo}
-        />
-      )}
-
       {/* ── Map ─────────────────────────────────────────── */}
-      <div
-        ref={mapContainer}
-        className="absolute inset-0"
-        style={{ width: "100%", height: "100%", zIndex: 0 }}
-      />
+      <div className="relative flex-1">
+        <div
+          ref={mapContainer}
+          className="absolute inset-0"
+          style={{ width: "100%", height: "100%", zIndex: 0 }}
+        />
+      </div>
+
+      {/* ── Columna dedicada: datos / detalles del tracking ── */}
+      <aside
+        className="relative shrink-0 border-l border-border bg-background z-10"
+        style={{ width: 320 }}
+      >
+        {selectedDevice ? (
+          <DeviceDetailsPanel
+            device={selectedDevice}
+            wsConnected={wsConnected}
+            selectedIsLive={selectedIsLive}
+            route={route}
+            routeLoading={routeLoading}
+            routeError={routeError}
+            range={range}
+            onRangeChange={setRange}
+            onClose={handleClosePanel}
+            onFlyTo={handleFlyTo}
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+            <Crosshair className="h-6 w-6 text-muted-foreground/40" />
+            <p className="text-sm font-medium text-muted-foreground">
+              No hay dispositivo seleccionado
+            </p>
+            <p className="text-xs text-muted-foreground/80">
+              Elige un dispositivo para ver sus datos y el seguimiento en vivo.
+            </p>
+          </div>
+        )}
+      </aside>
     </div>
   );
 }
