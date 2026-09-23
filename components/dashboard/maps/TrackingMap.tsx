@@ -10,11 +10,14 @@ import { useSocketIO } from "@/lib/hooks/useSocketIO";
 import { useDevicePositions } from "@/lib/hooks/useDevicePositions";
 import { useDeviceRoute } from "@/lib/hooks/useDeviceRoute";
 import {
-  geoFeature,
-  readGeoReferences,
-  type GeoReference,
-} from "@/lib/geo-references";
+  createGeovalla,
+  getGeovallas,
+  type GeovallaFeature,
+} from "@/lib/geovallas-api";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { DeviceMarker } from "./device-marker";
 import { DeviceListPanel } from "./DeviceListPanel";
 import { DeviceDetailsPanel } from "./DeviceDetailsPanel";
@@ -26,6 +29,10 @@ const TRAIL_COLOR = "#3b82f6";
 const ROUTE_COLOR = "#3b82f6";
 const ROUTE_SOURCE = "device-route";
 const GEO_COLOR = "#8b5cf6";
+const DRAFT_SOURCE = "geovalla-draft";
+const DRAFT_LINE_ID = "geovalla-draft-line";
+const DRAFT_FILL_ID = "geovalla-draft-fill";
+const DRAFT_POINTS_ID = "geovalla-draft-points";
 
 type LiveUpdate = {
   id: string;
@@ -69,8 +76,19 @@ export function TrackingMap() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [mapReady, setMapReady] = useState(false);
-  const [showGeofences, setShowGeofences] = useState(false);
-  const [geofences, setGeofences] = useState<GeoReference[]>([]);
+  const [showGeovallas, setShowGeovallas] = useState(false);
+  const [geovallasLoading, setGeovallasLoading] = useState(false);
+  const [geovallas, setGeovallas] = useState<GeovallaFeature[]>([]);
+
+  // ── Dibujo de geovallas ─────────────────────────────────
+  const [drawing, setDrawing] = useState(false);
+  const [drawVertices, setDrawVertices] = useState<[number, number][]>([]);
+  const [drawName, setDrawName] = useState("");
+  const [drawTipo, setDrawTipo] = useState("");
+  const [drawSaving, setDrawSaving] = useState(false);
+  const drawListenerRef = useRef<((e: mapboxgl.MapMouseEvent) => void) | null>(
+    null,
+  );
 
   const { devices, setDevices, refreshing, refresh } = useDevicePositions();
   const {
@@ -195,16 +213,40 @@ export function TrackingMap() {
     };
   }, []);
 
-  // ── Toggle geo-references overlay (read from localStorage) ─
-  const handleToggleGeofences = useCallback(() => {
-    setShowGeofences((prev) => {
-      const next = !prev;
-      if (next) setGeofences(readGeoReferences());
-      return next;
-    });
+  // ── Toggle geovallas (fetch desde el backend) ─────────────
+  const handleToggleGeovallas = useCallback(() => {
+    setShowGeovallas((prev) => !prev);
   }, []);
 
-  // ── Draw / remove geo-reference circles ───────────────────
+  // ── Cargar geovallas al activar el overlay ────────────────
+  useEffect(() => {
+    if (!showGeovallas) return;
+
+    let cancelled = false;
+    setGeovallasLoading(true);
+    getGeovallas()
+      .then((fc) => {
+        if (!cancelled) setGeovallas(fc.features);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "No se pudieron cargar las geovallas.",
+        );
+        setShowGeovallas(false);
+      })
+      .finally(() => {
+        if (!cancelled) setGeovallasLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showGeovallas]);
+
+  // ── Dibujar / quitar geovallas en el mapa ─────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
@@ -218,17 +260,17 @@ export function TrackingMap() {
         if (map.getLayer(fillId)) map.removeLayer(fillId);
         if (map.getLayer(lineId)) map.removeLayer(lineId);
         if (map.getSource(sourceId)) map.removeSource(sourceId);
-      } catch {}
+      } catch { }
     };
 
-    if (!showGeofences || geofences.length === 0) {
+    if (!showGeovallas || geovallas.length === 0) {
       removeLayers();
       return;
     }
 
     const data: GeoJSON.FeatureCollection = {
       type: "FeatureCollection",
-      features: geofences.map(geoFeature),
+      features: geovallas,
     };
 
     const existing = map.getSource(sourceId) as
@@ -253,7 +295,199 @@ export function TrackingMap() {
     }
 
     return removeLayers;
-  }, [showGeofences, geofences, mapReady]);
+  }, [showGeovallas, geovallas, mapReady]);
+
+  // ── Dibujo de geovalla: listener de clicks en el mapa ─────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const handler = (e: mapboxgl.MapMouseEvent) => {
+      setDrawVertices((prev) => [...prev, [e.lngLat.lng, e.lngLat.lat]]);
+    };
+    drawListenerRef.current = handler;
+
+    if (drawing) {
+      map.on("click", handler);
+      map.getCanvas().style.cursor = "crosshair";
+    } else {
+      map.off("click", handler);
+      map.getCanvas().style.cursor = "";
+    }
+
+    return () => {
+      if (handler === drawListenerRef.current) {
+        map.off("click", handler);
+        map.getCanvas().style.cursor = "";
+        drawListenerRef.current = null;
+      }
+    };
+  }, [drawing, mapReady]);
+
+  // ── Dibujo de geovalla: preview de línea / polígono / vértices ─
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const removeDraft = () => {
+      try {
+        if (map.getLayer(DRAFT_FILL_ID)) map.removeLayer(DRAFT_FILL_ID);
+        if (map.getLayer(DRAFT_LINE_ID)) map.removeLayer(DRAFT_LINE_ID);
+        if (map.getLayer(DRAFT_POINTS_ID)) map.removeLayer(DRAFT_POINTS_ID);
+        if (map.getSource(DRAFT_SOURCE)) map.removeSource(DRAFT_SOURCE);
+      } catch { }
+    };
+
+    if (!drawing || drawVertices.length === 0) {
+      removeDraft();
+      return;
+    }
+
+    const closed = drawVertices.length >= 3;
+    const ring: [number, number][] = closed
+      ? [...drawVertices, drawVertices[0]]
+      : drawVertices;
+
+    const lineData: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {},
+          geometry: { type: "LineString", coordinates: ring },
+        },
+        ...(closed
+          ? [
+            {
+              type: "Feature",
+              properties: {},
+              geometry: {
+                type: "Polygon",
+                coordinates: [ring],
+              } satisfies GeoJSON.Polygon,
+            } as GeoJSON.Feature,
+          ]
+          : []),
+      ],
+    };
+
+    const pointsData: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: drawVertices.map((v) => ({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "Point", coordinates: v },
+      })),
+    };
+
+    const existing = map.getSource(DRAFT_SOURCE) as
+      | mapboxgl.GeoJSONSource
+      | undefined;
+    if (existing && map.getLayer(DRAFT_FILL_ID)) {
+      existing.setData({
+        type: "FeatureCollection",
+        features: [...lineData.features, ...pointsData.features],
+      } as GeoJSON.FeatureCollection);
+    } else {
+      map.addSource(DRAFT_SOURCE, {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: [...lineData.features, ...pointsData.features],
+        } as GeoJSON.FeatureCollection,
+      });
+      map.addLayer({
+        id: DRAFT_FILL_ID,
+        type: "fill",
+        source: DRAFT_SOURCE,
+        paint: { "fill-color": GEO_COLOR, "fill-opacity": 0.15 },
+      });
+      map.addLayer({
+        id: DRAFT_LINE_ID,
+        type: "line",
+        source: DRAFT_SOURCE,
+        paint: {
+          "line-color": GEO_COLOR,
+          "line-width": 2,
+          "line-dasharray": [2, 1],
+        },
+      });
+      map.addLayer({
+        id: DRAFT_POINTS_ID,
+        type: "circle",
+        source: DRAFT_SOURCE,
+        paint: {
+          "circle-color": "#ffffff",
+          "circle-radius": 4,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": GEO_COLOR,
+        },
+      });
+    }
+
+    return removeDraft;
+  }, [drawing, drawVertices, mapReady]);
+
+  // ── Dibujo de geovalla: acciones ──────────────────────────
+  const startDrawing = useCallback(() => {
+    setDrawVertices([]);
+    setDrawName("");
+    setDrawTipo("");
+    setDrawing(true);
+  }, []);
+
+  const cancelDrawing = useCallback(() => {
+    setDrawVertices([]);
+    setDrawing(false);
+  }, []);
+
+  const undoVertex = useCallback(() => {
+    setDrawVertices((prev) => prev.slice(0, -1));
+  }, []);
+
+  const saveGeovalla = useCallback(async () => {
+    if (drawVertices.length < 3) {
+      toast.error("Dibuja al menos 3 puntos para cerrar el polígono.");
+      return;
+    }
+    setDrawSaving(true);
+    try {
+      await createGeovalla({
+        type: "Feature",
+        properties: {
+          nombre: drawName.trim() || undefined,
+          tipo: drawTipo.trim() || undefined,
+        },
+        geometry: {
+          type: "Polygon",
+          coordinates: [[...drawVertices, drawVertices[0]]],
+        },
+      });
+      toast.success("Geovalla creada");
+      cancelDrawing();
+      // Refrescar y mostrar las geovallas del backend
+      setGeovallasLoading(true);
+      try {
+        const fc = await getGeovallas();
+        setGeovallas(fc.features);
+        setShowGeovallas(true);
+      } catch (err) {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "No se pudieron cargar las geovallas.",
+        );
+      } finally {
+        setGeovallasLoading(false);
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "No se pudo crear la geovalla.",
+      );
+    } finally {
+      setDrawSaving(false);
+    }
+  }, [drawVertices, drawName, drawTipo, cancelDrawing]);
 
   // ── Dibujar / quitar la ruta en el mapa ──────────────────
   useEffect(() => {
@@ -264,7 +498,7 @@ export function TrackingMap() {
       try {
         if (map.getLayer(ROUTE_SOURCE)) map.removeLayer(ROUTE_SOURCE);
         if (map.getSource(ROUTE_SOURCE)) map.removeSource(ROUTE_SOURCE);
-      } catch {}
+      } catch { }
     };
 
     if (!route || route.lines.length === 0) {
@@ -531,9 +765,12 @@ export function TrackingMap() {
         onSearchQueryChange={setSearchQuery}
         selectedDeviceId={selectedDeviceId}
         onDeviceClick={handleDeviceClick}
-        showGeofences={showGeofences}
-        geofenceCount={geofences.length}
-        onToggleGeofences={handleToggleGeofences}
+        showGeovallas={showGeovallas}
+        geovallasLoading={geovallasLoading}
+        geovallaCount={geovallas.length}
+        onToggleGeovallas={handleToggleGeovallas}
+        geovallaDrawing={drawing}
+        onCreateGeovalla={drawing ? cancelDrawing : startDrawing}
       />
 
       {/* ── Map ─────────────────────────────────────────── */}
@@ -543,6 +780,69 @@ export function TrackingMap() {
           className="absolute inset-0"
           style={{ width: "100%", height: "100%", zIndex: 0 }}
         />
+
+        {/* ── Panel de dibujo de geovalla (modal) ─────────── */}
+        {drawing && (
+          <div
+            className="absolute bottom-4 left-1/2 w-[360px] -translate-x-1/2"
+            style={{ zIndex: 50 }}
+          >
+            <Card className="bg-background/95 border-border shadow-xl backdrop-blur-sm">
+              <CardContent className="space-y-3 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Haz clic en el mapa para agregar vértices del polígono (
+                  {drawVertices.length} punto
+                  {drawVertices.length !== 1 ? "s" : ""}).
+                </p>
+                {drawVertices.length >= 3 && (
+                  <div className="space-y-2">
+                    <Input
+                      value={drawName}
+                      onChange={(e) => setDrawName(e.target.value)}
+                      maxLength={200}
+                      placeholder="Nombre de la geovalla"
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      value={drawTipo}
+                      onChange={(e) => setDrawTipo(e.target.value)}
+                      maxLength={50}
+                      placeholder="Tipo (ej. zona, sede)"
+                      className="h-8 text-xs"
+                    />
+                    <Button
+                      onClick={saveGeovalla}
+                      disabled={drawSaving}
+                      size="sm"
+                      className="w-full"
+                    >
+                      {drawSaving ? "Creando…" : "Crear geovalla"}
+                    </Button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    onClick={undoVertex}
+                    disabled={drawVertices.length === 0}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    Deshacer
+                  </Button>
+                  <Button
+                    onClick={cancelDrawing}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       {/* ── Columna dedicada: datos / detalles del tracking ── */}

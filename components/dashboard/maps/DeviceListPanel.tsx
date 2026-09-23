@@ -9,6 +9,7 @@ import {
   MagnifyingGlass,
   MapPin,
   MapTrifoldIcon,
+  PencilSimpleLine,
 } from "@phosphor-icons/react";
 import {
   Card,
@@ -34,9 +35,12 @@ type DeviceListPanelProps = {
   onSearchQueryChange: (v: string) => void;
   selectedDeviceId: string | null;
   onDeviceClick: (id: string) => void;
-  showGeofences: boolean;
-  geofenceCount: number;
-  onToggleGeofences: () => void;
+  showGeovallas: boolean;
+  geovallasLoading: boolean;
+  geovallaCount: number;
+  onToggleGeovallas: () => void;
+  geovallaDrawing: boolean;
+  onCreateGeovalla: () => void;
 };
 
 export function DeviceListPanel({
@@ -48,9 +52,12 @@ export function DeviceListPanel({
   onSearchQueryChange,
   selectedDeviceId,
   onDeviceClick,
-  showGeofences,
-  geofenceCount,
-  onToggleGeofences,
+  showGeovallas,
+  geovallasLoading,
+  geovallaCount,
+  onToggleGeovallas,
+  geovallaDrawing,
+  onCreateGeovalla,
 }: DeviceListPanelProps) {
   return (
     <div
@@ -172,26 +179,38 @@ export function DeviceListPanel({
           </CardContent>
         )}
 
-        <CardContent className="pt-0 pb-3">
+        <CardContent className="pt-0 pb-3 space-y-2">
           <Button
-            onClick={onToggleGeofences}
-            variant={showGeofences ? "default" : "outline"}
+            onClick={onCreateGeovalla}
+            variant={geovallaDrawing ? "default" : "outline"}
             size="sm"
             className="w-full text-xs"
           >
+            <PencilSimpleLine className="h-3.5 w-3.5" />
+            {geovallaDrawing ? "Dibujando…" : "Dibujar geovalla"}
+          </Button>
+          <Button
+            onClick={onToggleGeovallas}
+            variant={showGeovallas ? "default" : "outline"}
+            size="sm"
+            className="w-full text-xs"
+            disabled={geovallasLoading}
+          >
             <MapTrifoldIcon className="h-3.5 w-3.5" />
-            {showGeofences
-              ? "Ocultar geo-referencias"
-              : "Mostrar geo-referencias"}
-            {showGeofences ? (
+            {geovallasLoading
+              ? "Cargando geovallas…"
+              : showGeovallas
+                ? "Ocultar geovallas"
+                : "Mostrar geovallas"}
+            {showGeovallas ? (
               <EyeSlashIcon className="h-3.5 w-3.5 ml-auto" />
             ) : (
               <EyeIcon className="h-3.5 w-3.5 ml-auto" />
             )}
           </Button>
-          {showGeofences && geofenceCount === 0 && (
+          {showGeovallas && geovallaCount === 0 && !geovallasLoading && (
             <p className="text-xs text-muted-foreground text-center mt-2">
-              No hay geo-referencias guardadas.
+              No hay geovallas registradas.
             </p>
           )}
         </CardContent>
