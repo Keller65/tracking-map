@@ -10,6 +10,7 @@ import {
   MapPin,
   MapTrifoldIcon,
   PencilSimpleLine,
+  X,
 } from "@phosphor-icons/react";
 import {
   Card,
@@ -41,6 +42,8 @@ type DeviceListPanelProps = {
   onToggleGeovallas: () => void;
   geovallaDrawing: boolean;
   onCreateGeovalla: () => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 };
 
 export function DeviceListPanel({
@@ -58,7 +61,32 @@ export function DeviceListPanel({
   onToggleGeovallas,
   geovallaDrawing,
   onCreateGeovalla,
+  collapsed,
+  onToggleCollapsed,
 }: DeviceListPanelProps) {
+  if (collapsed) {
+    return (
+      <div
+        className="absolute top-4 left-4 z-10"
+        style={{ zIndex: 10 }}
+      >
+        <Button
+          onClick={onToggleCollapsed}
+          variant="outline"
+          size="sm"
+          className="shadow-lg gap-2 bg-background/95 backdrop-blur-sm"
+          aria-label="Mostrar dispositivos"
+          title="Mostrar dispositivos"
+        >
+          <Car className="h-4 w-4" />
+          <span className="rounded-full bg-primary text-primary-foreground flex items-center justify-center h-5 min-w-5 px-1 text-[10px] font-semibold">
+            {devices.length}
+          </span>
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div
       className="absolute top-4 left-4 z-10 flex flex-col gap-3 w-[min(320px,calc(100vw-2rem))]"
@@ -98,6 +126,16 @@ export function DeviceListPanel({
                 <ArrowsClockwiseIcon
                   className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
                 />
+              </Button>
+              <Button
+                onClick={onToggleCollapsed}
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground"
+                aria-label="Ocultar panel"
+                title="Ocultar panel"
+              >
+                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>

@@ -84,6 +84,24 @@ export function TrackingMap() {
   const [geovallasLoading, setGeovallasLoading] = useState(false);
   const [geovallas, setGeovallas] = useState<GeovallaFeature[]>([]);
 
+  // ── Responsive ──────────────────────────────────────────
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.innerWidth >= 768,
+  );
+  const [listCollapsed, setListCollapsed] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onChange = () => {
+      setIsDesktop(mq.matches);
+      setListCollapsed(!mq.matches);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   // ── Dibujo de geovallas ─────────────────────────────────
   const [drawing, setDrawing] = useState(false);
   const [drawVertices, setDrawVertices] = useState<[number, number][]>([]);
@@ -832,6 +850,8 @@ if (Number.isFinite(distance) && distance <= GEOFENCE_TOLERANCE_M) {
         onToggleGeovallas={handleToggleGeovallas}
         geovallaDrawing={drawing}
         onCreateGeovalla={drawing ? cancelDrawing : startDrawing}
+        collapsed={listCollapsed}
+        onToggleCollapsed={() => setListCollapsed((c) => !c)}
       />
 
       {/* ── Map ─────────────────────────────────────────── */}
@@ -906,33 +926,37 @@ if (Number.isFinite(distance) && distance <= GEOFENCE_TOLERANCE_M) {
         )}
       </div>
 
-      {/* ── Columna dedicada: datos / detalles del tracking ── */}
-      <aside className="absolute inset-y-0 right-0 z-30 w-4/5 max-w-sm shrink-0 border-l border-border bg-background shadow-2xl sm:w-[320px] md:relative md:shadow-none" >
-        {selectedDevice ? (
-          <DeviceDetailsPanel
-            device={selectedDevice}
-            wsConnected={wsConnected}
-            selectedIsLive={selectedIsLive}
-            route={route}
-            routeLoading={routeLoading}
-            routeError={routeError}
-            range={range}
-            onRangeChange={setRange}
-            onClose={handleClosePanel}
-            onFlyTo={handleFlyTo}
-          />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-            <Crosshair className="h-6 w-6 text-muted-foreground/40" />
-            <p className="text-sm font-medium text-muted-foreground">
-              No hay dispositivo seleccionado
-            </p>
-            <p className="text-xs text-muted-foreground/80">
-              Elige un dispositivo para ver sus datos y el seguimiento en vivo.
-            </p>
-          </div>
-        )}
-      </aside>
+      {/* ── Panel de detalles: bottom-sheet en móvil / columna en desktop ── */}
+      {(selectedDevice || isDesktop) && (
+        <aside
+          className="absolute inset-x-0 bottom-0 z-30 h-[60dvh] w-full shrink-0 border-t border-border bg-background shadow-2xl rounded-t-2xl md:inset-y-0 md:right-0 md:left-auto md:h-full md:w-[320px] md:rounded-none md:border-t-0 md:border-l md:shadow-none"
+        >
+          {selectedDevice ? (
+            <DeviceDetailsPanel
+              device={selectedDevice}
+              wsConnected={wsConnected}
+              selectedIsLive={selectedIsLive}
+              route={route}
+              routeLoading={routeLoading}
+              routeError={routeError}
+              range={range}
+              onRangeChange={setRange}
+              onClose={handleClosePanel}
+              onFlyTo={handleFlyTo}
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+              <Crosshair className="h-6 w-6 text-muted-foreground/40" />
+              <p className="text-sm font-medium text-muted-foreground">
+                No hay dispositivo seleccionado
+              </p>
+              <p className="text-xs text-muted-foreground/80">
+                Elige un dispositivo para ver sus datos y el seguimiento en vivo.
+              </p>
+            </div>
+          )}
+        </aside>
+      )}
     </div>
   );
 }
