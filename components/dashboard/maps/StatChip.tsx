@@ -13,26 +13,24 @@ export function StatChip({
   mono?: boolean;
   connected?: boolean;
 }) {
-  const bgClass = connected === false
-    ? "bg-red-50 dark:bg-red-400/10"
-    : "bg-muted/50";
-  const textClass = connected === false
-    ? "text-red-600 dark:text-red-400"
-    : "text-muted-foreground";
-  const valueStyle = connected === false
-    ? { color: "#ef4444" }
-    : { color: accent ?? "inherit" };
+  const accentColor = connected === false ? "#ef4444" : accent;
 
   return (
-    <div className={`${bgClass} rounded-lg p-2 space-y-0.5`}>
-      <div className={`flex items-center gap-1 text-xs ${textClass} uppercase tracking-wide`}>
-        {icon}
-        {label}
+    <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5 transition-colors hover:bg-muted/50">
+      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <span
+          className="flex shrink-0 items-center"
+          style={accentColor ? { color: accentColor } : undefined}
+        >
+          {icon}
+        </span>
+        <span className="truncate">{label}</span>
       </div>
       <p
-        className={`text-xs font-semibold leading-tight truncate ${mono ? "font-mono" : ""
-          }`}
-        style={valueStyle}
+        className={`mt-1 truncate text-sm font-semibold leading-tight ${
+          mono ? "font-mono tabular-nums" : ""
+        }`}
+        style={accentColor ? { color: accentColor } : undefined}
       >
         {value}
       </p>

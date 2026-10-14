@@ -6,7 +6,6 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { toast } from "sonner";
 import pointToPolygonDistance from "@turf/point-to-polygon-distance";
-import { Crosshair } from "@phosphor-icons/react";
 import { useSocketIO } from "@/lib/hooks/useSocketIO";
 import { useDevicePositions } from "@/lib/hooks/useDevicePositions";
 import { useDeviceRoute } from "@/lib/hooks/useDeviceRoute";
@@ -29,6 +28,7 @@ const MAP_STYLE = "mapbox://styles/mapbox/streets-v11";
 const TRAIL_COLOR = "#3b82f6";
 const ROUTE_COLOR = "#3b82f6";
 const ROUTE_SOURCE = "device-route";
+const PRIVATE_SOURCE = "device-route-private";
 const GEO_COLOR = "#8b5cf6";
 // Margen de tolerancia por ruido del GPS: cuenta como "dentro" si el punto
 // está a menos de esta distancia del borde del polígono.
@@ -86,19 +86,13 @@ export function TrackingMap() {
   const [geovallas, setGeovallas] = useState<GeovallaFeature[]>([]);
 
   // ── Responsive ──────────────────────────────────────────
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== "undefined" && window.innerWidth >= 768,
-  );
   const [listCollapsed, setListCollapsed] = useState(
     () => typeof window !== "undefined" && window.innerWidth < 768,
   );
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
-    const onChange = () => {
-      setIsDesktop(mq.matches);
-      setListCollapsed(!mq.matches);
-    };
+    const onChange = () => setListCollapsed(!mq.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
@@ -575,51 +569,76 @@ if (Number.isFinite(distance) && distance <= GEOFENCE_TOLERANCE_M) {
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
-    const removeRoute = () => {
+    const removeLayer = (id: string) => {
       try {
-        if (map.getLayer(ROUTE_SOURCE)) map.removeLayer(ROUTE_SOURCE);
-        if (map.getSource(ROUTE_SOURCE)) map.removeSource(ROUTE_SOURCE);
+        if (map.getLayer(id)) map.removeLayer(id);
+        if (map.getSource(id)) map.removeSource(id);
       } catch { }
     };
 
-    if (!route || route.lines.length === 0) {
-      removeRoute();
-      return;
-    }
-
-    const lineData: GeoJSON.FeatureCollection = {
-      type: "FeatureCollection",
-      features: route.lines.map((coords) => ({
-        type: "Feature",
-        properties: {},
-        geometry: { type: "LineString", coordinates: coords },
-      })),
+    const applyLine = (
+      id: string,
+      lines: [number, number][][],
+      paint: mapboxgl.LinePaint,
+      layout?: mapboxgl.LineLayout,
+    ) => {
+      if (lines.length === 0) {
+        removeLayer(id);
+        return;
+      }
+      const data: GeoJSON.FeatureCollection = {
+        type: "FeatureCollection",
+        features: lines.map((coords) => ({
+          type: "Feature",
+          properties: {},
+          geometry: { type: "LineString", coordinates: coords },
+        })),
+      };
+      const existing = map.getSource(id) as mapboxgl.GeoJSONSource | undefined;
+      if (existing) {
+        existing.setData(data);
+      } else {
+        map.addSource(id, { type: "geojson", data });
+        map.addLayer({
+          id,
+          type: "line",
+          source: id,
+          paint,
+          ...(layout ? { layout } : {}),
+        });
+      }
     };
 
-    const existing = map.getSource(ROUTE_SOURCE) as
-      | mapboxgl.GeoJSONSource
-      | undefined;
-    if (existing) {
-      existing.setData(lineData);
-    } else {
-      map.addSource(ROUTE_SOURCE, { type: "geojson", data: lineData });
-      map.addLayer({
-        id: ROUTE_SOURCE,
-        type: "line",
-        source: ROUTE_SOURCE,
-        paint: {
-          "line-color": ROUTE_COLOR,
-          "line-width": 4,
-          "line-opacity": 0.85,
-        },
-      });
-    }
+    const publicLines = route?.lines ?? [];
+    const privateLines = route?.privateLines ?? [];
+
+    // Ruta ajustada a calles: línea sólida.
+    applyLine(ROUTE_SOURCE, publicLines, {
+      "line-color": ROUTE_COLOR,
+      "line-width": 4,
+      "line-opacity": 0.85,
+    });
+    // Tramo fuera de vía / terreno privado: punteado al 60%.
+    applyLine(
+      PRIVATE_SOURCE,
+      privateLines,
+      {
+        "line-color": ROUTE_COLOR,
+        "line-width": 4,
+        "line-opacity": 0.6,
+        "line-dasharray": [0.5, 2],
+      },
+      { "line-cap": "round" },
+    );
+
+    const allLines = [...publicLines, ...privateLines];
+    if (allLines.length === 0) return;
 
     let minLng = Infinity,
       minLat = Infinity,
       maxLng = -Infinity,
       maxLat = -Infinity;
-    for (const coords of route.lines) {
+    for (const coords of allLines) {
       for (const [lng, lat] of coords) {
         if (lng < minLng) minLng = lng;
         if (lng > maxLng) maxLng = lng;
@@ -627,10 +646,7 @@ if (Number.isFinite(distance) && distance <= GEOFENCE_TOLERANCE_M) {
         if (lat > maxLat) maxLat = lat;
       }
     }
-    if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) {
-      removeRoute();
-      return;
-    }
+    if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) return;
     map.fitBounds(
       [
         [minLng, minLat],
@@ -639,7 +655,10 @@ if (Number.isFinite(distance) && distance <= GEOFENCE_TOLERANCE_M) {
       { padding: 60, duration: 1200, maxZoom: 16 },
     );
 
-    return removeRoute;
+    return () => {
+      removeLayer(ROUTE_SOURCE);
+      removeLayer(PRIVATE_SOURCE);
+    };
   }, [route, mapReady]);
 
   // ── Draw / update markers on map ──────────────────────────
@@ -928,38 +947,24 @@ if (Number.isFinite(distance) && distance <= GEOFENCE_TOLERANCE_M) {
         )}
       </div>
 
-      {/* ── Panel de detalles: bottom-sheet en móvil / columna en desktop ── */}
-      {(selectedDevice || isDesktop) && (
-        <aside
-          className="absolute inset-x-0 bottom-0 z-30 h-[60dvh] w-full shrink-0 border-t border-border bg-background shadow-2xl rounded-t-2xl md:inset-y-0 md:right-0 md:left-auto md:h-full md:w-[320px] md:rounded-none md:border-t-0 md:border-l md:shadow-none"
-        >
-          {selectedDevice ? (
-            <DeviceDetailsPanel
-              device={selectedDevice}
-              wsConnected={wsConnected}
-              selectedIsLive={selectedIsLive}
-              route={route}
-              routeLoading={routeLoading}
-              routeError={routeError}
-              snapping={snapping}
-              snapToRoads={snapToRoads}
-              onSnapToRoadsChange={setSnapToRoads}
-              range={range}
-              onRangeChange={setRange}
-              onClose={handleClosePanel}
-              onFlyTo={handleFlyTo}
-            />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-              <Crosshair className="h-6 w-6 text-muted-foreground/40" />
-              <p className="text-sm font-medium text-muted-foreground">
-                No hay dispositivo seleccionado
-              </p>
-              <p className="text-xs text-muted-foreground/80">
-                Elige un dispositivo para ver sus datos y el seguimiento en vivo.
-              </p>
-            </div>
-          )}
+      {/* ── Panel de detalles flotante: bottom en móvil / tarjeta en desktop ── */}
+      {selectedDevice && (
+        <aside className="absolute inset-x-4 bottom-4 z-30 flex max-h-[70dvh] flex-col overflow-hidden rounded-xl border border-border bg-background/95 shadow-xl backdrop-blur-sm md:inset-x-auto md:top-4 md:right-4 md:bottom-auto md:w-[340px] md:max-h-[calc(100dvh-2rem)]">
+          <DeviceDetailsPanel
+            device={selectedDevice}
+            wsConnected={wsConnected}
+            selectedIsLive={selectedIsLive}
+            route={route}
+            routeLoading={routeLoading}
+            routeError={routeError}
+            snapping={snapping}
+            snapToRoads={snapToRoads}
+            onSnapToRoadsChange={setSnapToRoads}
+            range={range}
+            onRangeChange={setRange}
+            onClose={handleClosePanel}
+            onFlyTo={handleFlyTo}
+          />
         </aside>
       )}
     </div>

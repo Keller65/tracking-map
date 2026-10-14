@@ -11,7 +11,12 @@ import {
 } from "@/lib/isync-api";
 import type { DateRange } from "react-day-picker";
 
-async function matchRouteToRoads(lines: LonLat[][]): Promise<LonLat[][]> {
+type MatchedSegments = {
+  onRoad: LonLat[][];
+  offRoad: LonLat[][];
+};
+
+async function matchRouteToRoads(lines: LonLat[][]): Promise<MatchedSegments> {
   const res = await fetch("/api/mapbox-match", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -21,10 +26,13 @@ async function matchRouteToRoads(lines: LonLat[][]): Promise<LonLat[][]> {
   if (!res.ok) {
     throw new Error(data?.error ?? "No se pudo ajustar la ruta a las calles.");
   }
-  if (!Array.isArray(data?.lines)) {
+  if (!Array.isArray(data?.onRoad) || !Array.isArray(data?.offRoad)) {
     throw new Error("Respuesta inválida de map-matching.");
   }
-  return data.lines as LonLat[][];
+  return {
+    onRoad: data.onRoad as LonLat[][],
+    offRoad: data.offRoad as LonLat[][],
+  };
 }
 
 export function useDeviceRoute(
@@ -112,8 +120,10 @@ export function useDeviceRoute(
     setRouteError(null);
 
     matchRouteToRoads(rawRoute.lines)
-      .then((lines) => {
-        if (!cancelled) setRoute({ ...rawRoute, lines });
+      .then(({ onRoad, offRoad }) => {
+        if (!cancelled) {
+          setRoute({ ...rawRoute, lines: onRoad, privateLines: offRoad });
+        }
       })
       .catch((err) => {
         if (cancelled) return;

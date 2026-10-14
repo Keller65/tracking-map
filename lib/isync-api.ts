@@ -145,6 +145,8 @@ export type RouteStop = {
 
 export type RouteInfo = {
   lines: LonLat[][];
+  /** Tramos fuera de vía / terreno privado (opcional, del ajuste a calles). */
+  privateLines?: LonLat[][];
   km: number;
   duracionMin: number;
   velocidadMax: number;

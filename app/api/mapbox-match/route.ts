@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const matched = await matchLinesToRoads(lines, token);
-    return Response.json({ lines: matched });
+    const { onRoad, offRoad } = await matchLinesToRoads(lines, token);
+    return Response.json({ onRoad, offRoad });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Error de map-matching.";
