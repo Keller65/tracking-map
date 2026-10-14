@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, JetBrains_Mono, Poppins } from "next/font/google";
 import "./globals.css";
+import "@/components/arc/foundation.css";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
 

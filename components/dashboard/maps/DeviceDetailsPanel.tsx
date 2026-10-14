@@ -25,6 +25,9 @@ type DeviceDetailsPanelProps = {
   route: RouteInfo | null;
   routeLoading: boolean;
   routeError: string | null;
+  snapping: boolean;
+  snapToRoads: boolean;
+  onSnapToRoadsChange: (enabled: boolean) => void;
   range: DateRange | undefined;
   onRangeChange: (range: DateRange | undefined) => void;
   onClose: () => void;
@@ -38,11 +41,15 @@ export function DeviceDetailsPanel({
   route,
   routeLoading,
   routeError,
+  snapping,
+  snapToRoads,
+  onSnapToRoadsChange,
   range,
   onRangeChange,
   onClose,
   onFlyTo,
 }: DeviceDetailsPanelProps) {
+  const hasCompleteRange = Boolean(range?.from && range?.to);
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
       {/* Header */}
@@ -114,6 +121,41 @@ export function DeviceDetailsPanel({
 
         {/* Filtro de historial por rango de fechas */}
         <DateRangePicker range={range} onRangeChange={onRangeChange} />
+
+        {!hasCompleteRange && (
+          <p className="text-xs text-muted-foreground px-1">
+            Selecciona un rango de fechas para cargar el historial.
+          </p>
+        )}
+
+        {/* Ajustar la ruta a las calles (Mapbox Map Matching) */}
+        {hasCompleteRange && (
+          <label className="border-border flex items-center justify-between rounded-md border px-3 py-2.5">
+            <span className="flex flex-col gap-0.5">
+              <span className="text-foreground text-xs font-medium">
+                Ajustar Ruta
+              </span>
+              <span className="text-muted-foreground text-[11px]">
+                Ajustar el trazado a las calles (Mapbox)
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={snapToRoads}
+              disabled={routeLoading || snapping}
+              onChange={(event) => onSnapToRoadsChange(event.target.checked)}
+              className="accent-primary size-4 cursor-pointer disabled:cursor-not-allowed"
+              aria-label="Ajustar ruta a las calles"
+            />
+          </label>
+        )}
+
+        {snapping && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+            <span className="w-3 h-3 rounded-full border-2 border-muted-foreground/40 border-t-muted-foreground animate-spin" />
+            Ajustando la ruta a las calles…
+          </div>
+        )}
 
         {/* Route summary (REST) */}
         {routeLoading && (

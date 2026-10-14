@@ -79,6 +79,7 @@ export function TrackingMap() {
   // ── State ──────────────────────────────────────────────────
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [snapToRoads, setSnapToRoads] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [showGeovallas, setShowGeovallas] = useState(false);
   const [geovallasLoading, setGeovallasLoading] = useState(false);
@@ -117,9 +118,10 @@ export function TrackingMap() {
     route,
     routeLoading,
     routeError,
+    snapping,
     range,
     setRange,
-  } = useDeviceRoute(selectedDeviceId);
+  } = useDeviceRoute(selectedDeviceId, snapToRoads);
 
   // WebSocket for realtime tracking
   const wsHost =
@@ -939,6 +941,9 @@ if (Number.isFinite(distance) && distance <= GEOFENCE_TOLERANCE_M) {
               route={route}
               routeLoading={routeLoading}
               routeError={routeError}
+              snapping={snapping}
+              snapToRoads={snapToRoads}
+              onSnapToRoadsChange={setSnapToRoads}
               range={range}
               onRangeChange={setRange}
               onClose={handleClosePanel}
