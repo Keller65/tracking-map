@@ -9,7 +9,11 @@ import {
   type RouteInfo,
   type RutasParams,
 } from "@/lib/isync-api";
+import { chaikinSmooth } from "@/lib/route";
 import type { DateRange } from "react-day-picker";
+
+// Iteraciones de Chaikin para suavizar los tramos fuera de vía.
+const PRIVATE_SMOOTH_ITERATIONS = 2;
 
 type MatchedSegments = {
   onRoad: LonLat[][];
@@ -122,7 +126,14 @@ export function useDeviceRoute(
     matchRouteToRoads(rawRoute.lines)
       .then(({ onRoad, offRoad }) => {
         if (!cancelled) {
-          setRoute({ ...rawRoute, lines: onRoad, privateLines: offRoad });
+          setRoute({
+            ...rawRoute,
+            lines: onRoad,
+            // Chaikin solo en los tramos fuera de vía (punteados).
+            privateLines: offRoad.map((line) =>
+              chaikinSmooth(line, PRIVATE_SMOOTH_ITERATIONS),
+            ),
+          });
         }
       })
       .catch((err) => {

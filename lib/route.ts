@@ -2,6 +2,31 @@ import { haversineMeters, toRad } from "@/lib/geo";
 
 export type LngLat = [number, number];
 
+/**
+ * Chaikin corner-cutting: suaviza una polilínea recortando sus vértices
+ * sin salirse del polígono (no sobrepasa, a diferencia de Catmull-Rom).
+ */
+export function chaikinSmooth(
+  coordinates: LngLat[],
+  iterations = 2,
+): LngLat[] {
+  if (coordinates.length < 3 || iterations <= 0) return coordinates;
+
+  let points = coordinates;
+  for (let iter = 0; iter < iterations; iter += 1) {
+    const next: LngLat[] = [points[0]];
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const p = points[i];
+      const q = points[i + 1];
+      next.push([0.75 * p[0] + 0.25 * q[0], 0.75 * p[1] + 0.25 * q[1]]);
+      next.push([0.25 * p[0] + 0.75 * q[0], 0.25 * p[1] + 0.75 * q[1]]);
+    }
+    next.push(points[points.length - 1]);
+    points = next;
+  }
+  return points;
+}
+
 /** Interpolates a route with a uniform Catmull-Rom spline. */
 export function catmullRomRoute(
   coordinates: LngLat[],
